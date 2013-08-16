@@ -9,36 +9,6 @@ use syntax::{ast, codemap};
 pub mod words;
 mod visitor;
 
-fn get_ast(path: Path) -> (@codemap::CodeMap, @ast::Crate) {
-    use rustc::driver::{driver, session};
-    use syntax::diagnostic;
-
-    let parsesess = syntax::parse::new_parse_sess(None);
-    let input = driver::file_input(path);
-
-    let sessopts = @session::options {
-        binary: @"spellck",
-        maybe_sysroot: Some(@os::self_exe_path().unwrap().pop()),
-        .. (*session::basic_options()).clone()
-    };
-
-
-    let diagnostic_handler = diagnostic::mk_handler(None);
-    let span_diagnostic_handler =
-        diagnostic::mk_span_handler(diagnostic_handler, parsesess.cm);
-
-    let sess = driver::build_session_(sessopts, parsesess.cm,
-                                      diagnostic::emit,
-                                      span_diagnostic_handler);
-
-    let mut cfg = driver::build_configuration(sess, @"spellck", &input);
-    cfg.push(@codemap::dummy_spanned(ast::MetaWord(@"stage2")));
-
-    let crate = driver::phase_1_parse_input(sess, cfg.clone(), &input);
-    (parsesess.cm,
-     driver::phase_2_configure_and_expand(sess, cfg, crate))
-}
-
 fn main() {
     use extra::getopts;
     use extra::getopts::groups;
@@ -69,48 +39,56 @@ fn main() {
         }
     }
 
-    match matches.free {
-        [name] => {
-            let (cm, crate) = get_ast(Path(name));
-            let visitor = @mut visitor::SpellingVisitor::new(words);
+    // one visitor; the internal list of misspelled words gets reset
+    // for each file, since the spans could conflict.
+    let visitor = @mut visitor::SpellingVisitor::new(words);
 
-            visitor.check_crate(crate);
+    for name in matches.free.iter() {
+        let (cm, crate) = get_ast(Path(*name));
 
-            struct RevSort {
-                sp: codemap::span,
-                words: HashSet<~str>
-            }
-            impl Ord for RevSort {
-                fn lt(&self, other: &RevSort) -> bool {
-                    self.sp.lo > other.sp.lo ||
-                        (self.sp.lo == other.sp.lo && self.sp.hi > other.sp.hi)
-                }
-            }
+        visitor.clear();
+        visitor.check_crate(crate);
 
-            let pq: priority_queue::PriorityQueue<RevSort> =
-                do visitor.misspellings.clone().move_iter().map |(k, v)| {
-                RevSort { sp: k, words: v }
-            }.collect();
-
-            for RevSort {sp, words} in pq.to_sorted_vec().move_iter() {
-                let lines = cm.span_to_lines(sp);
-                let sp_text = cm.span_to_str(sp);
-
-                let ess = if words.len() == 1 {""} else {"s"};
-                printfln!("%s: misspelled word%s: %s", sp_text, ess,
-                          // yuck!
-                          words.move_iter().to_owned_vec().connect(", "));
-                match lines.lines {
-                    [line_num, .. _] => {
-                        let line = lines.file.get_line(line_num as int);
-                        printfln!("%s: %s", sp_text, line);
-                    }
-                    _ => {}
-                }
+        struct Sort<'self> {
+            sp: codemap::span,
+            words: &'self HashSet<~str>
+        }
+        impl<'self> Ord for Sort<'self> {
+            fn lt(&self, other: &Sort<'self>) -> bool {
+                self.sp.lo < other.sp.lo ||
+                    (self.sp.lo == other.sp.lo && self.sp.hi < other.sp.hi)
             }
         }
-        _ => {
-            io::stderr().write_line(fmt!("Expected exactly one filename"))
+
+        // extract the lines in order of the spans, so that e.g. files
+        // are grouped together, and lines occur in increasing order.
+        let pq: priority_queue::PriorityQueue<Sort> =
+            do visitor.misspellings.iter().map |(k, v)| {
+                Sort { sp: *k, words: v }
+            }.collect();
+
+        // run through the spans, printing the words that are
+        // apparently misspelled
+        for Sort {sp, words} in pq.to_sorted_vec().move_iter() {
+            let lines = cm.span_to_lines(sp);
+            let sp_text = cm.span_to_str(sp);
+
+            let ess = if words.len() == 1 {""} else {"s"};
+
+            // required for connect :(
+            let word_vec = words.iter().map(|s| s.as_slice()).to_owned_vec();
+
+            printfln!("%s: misspelled word%s: %s", sp_text, ess,
+                      word_vec.connect(", "));
+
+            // first line; no lines = no printing
+            match lines.lines {
+                [line_num, .. _] => {
+                    let line = lines.file.get_line(line_num as int);
+                    printfln!("%s: %s", sp_text, line);
+                }
+                _ => {}
+            }
         }
     }
 }
@@ -129,4 +107,37 @@ fn read_words_into<E: Extendable<~str>>
             false
         }
     }
+}
+
+/// Extract the expanded ast of a crate, along with the codemap which
+/// connects source code locations to the actual code.
+fn get_ast(path: Path) -> (@codemap::CodeMap, @ast::Crate) {
+    use rustc::driver::{driver, session};
+    use syntax::diagnostic;
+
+    // cargo culted from rustdoc_ng :(
+    let parsesess = syntax::parse::new_parse_sess(None);
+    let input = driver::file_input(path);
+
+    let sessopts = @session::options {
+        binary: @"spellck",
+        maybe_sysroot: Some(@os::self_exe_path().unwrap().pop()),
+        .. (*session::basic_options()).clone()
+    };
+
+
+    let diagnostic_handler = diagnostic::mk_handler(None);
+    let span_diagnostic_handler =
+        diagnostic::mk_span_handler(diagnostic_handler, parsesess.cm);
+
+    let sess = driver::build_session_(sessopts, parsesess.cm,
+                                      diagnostic::emit,
+                                      span_diagnostic_handler);
+
+    let cfg = driver::build_configuration(sess, @"spellck", &input);
+
+    let crate = driver::phase_1_parse_input(sess, cfg.clone(), &input);
+
+    (parsesess.cm,
+     driver::phase_2_configure_and_expand(sess, cfg, crate))
 }
