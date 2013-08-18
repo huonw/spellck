@@ -1,3 +1,5 @@
+#[deny(missing_doc)];
+
 extern mod extra;
 extern mod syntax;
 extern mod rustc;
@@ -8,6 +10,8 @@ use syntax::{ast, codemap};
 
 pub mod words;
 mod visitor;
+
+static DEFAULT_DICT: &'static str = "/usr/share/dict/words";
 
 fn main() {
     use extra::getopts;
@@ -25,16 +29,16 @@ fn main() {
         return;
     }
 
-    let mut words = HashSet::new::<~str>();
+    let mut words = HashSet::new();
 
     if !(getopts::opt_present(&matches, "n") ||
          getopts::opt_present(&matches, "no-def-dict")) {
-        if !read_words_into(&Path("/usr/share/dict/words"), &mut words) {
+        if !read_lines_into(&Path(DEFAULT_DICT), &mut words) {
             return
         }
     }
     for dict in getopts::opt_strs(&matches, "d").move_iter() {
-        if !read_words_into(&Path(dict), &mut words) {
+        if !read_lines_into(&Path(dict), &mut words) {
             return
         }
     }
@@ -75,7 +79,7 @@ fn main() {
 
             let ess = if words.len() == 1 {""} else {"s"};
 
-            // required for connect :(
+            // [] required for connect :(
             let word_vec = words.iter().map(|s| s.as_slice()).to_owned_vec();
 
             printfln!("%s: misspelled word%s: %s", sp_text, ess,
@@ -93,7 +97,8 @@ fn main() {
     }
 }
 
-fn read_words_into<E: Extendable<~str>>
+/// Load each line of the file `p` into the given `Extendable` object.
+fn read_lines_into<E: Extendable<~str>>
                   (p: &Path, e: &mut E) -> bool {
     match io::file_reader(p) {
         Ok(r) => {

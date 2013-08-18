@@ -13,12 +13,18 @@ use words;
 /// Keeps track of the reference dictionary and the misspelled words
 /// through a traversal of the whole ast.
 pub struct SpellingVisitor {
+    /// The reference dictionary.
     words: hashmap::HashSet<~str>,
+    /// The misspelled words, indexed by the span on which they occur.
     misspellings: hashmap::HashMap<span, hashmap::HashSet<~str>>,
+
+    /// Whether the traversal should only check documentation, not
+    /// idents; gets controlled internally, e.g. for `extern` blocks.
     doc_only: bool
 }
 
 impl SpellingVisitor {
+    /// Create a new Spelling Visitor.
     pub fn new(words: hashmap::HashSet<~str>) -> SpellingVisitor {
         SpellingVisitor {
             words: words,
@@ -27,6 +33,7 @@ impl SpellingVisitor {
         }
     }
 
+    /// Clear the memory of misspellings
     pub fn clear(&mut self) {
         self.misspellings.clear()
     }
@@ -40,12 +47,12 @@ impl SpellingVisitor {
             self.words.contains_equiv(&w.to_ascii_lower())
     }
 
-    /// Checks the given word for correctness, including splitting
-    /// `foo_bar` and `FooBar` into `foo` & `bar` and `Foo` & `Bar`
+    /// Check a word for correctness, including splitting `foo_bar`
+    /// and `FooBar` into `foo` & `bar` and `Foo` & `Bar`
     /// respectively. This inserts any incorrect word(s) into the
     /// misspelling map.
     fn check_subwords(&mut self, w: &str, sp: span) {
-        for w in words::words(w) {
+        for w in words::subwords(w) {
             if !self.raw_word_is_correct(w) {
                 let insert = |_: &span, _: ()| {
                     let mut set = hashmap::HashSet::new();
@@ -59,7 +66,8 @@ impl SpellingVisitor {
         }
     }
 
-    /// Checks a single ident
+    /// Check a single ident for misspellings; possibly separating it
+    /// into subwords.
     fn check_ident(&mut self, id: ident, sp: span) {
         if self.doc_only { return }
 
@@ -78,7 +86,7 @@ impl SpellingVisitor {
         self.check_subwords(word, sp);
     }
 
-    /// Check the #[doc=""] (and the commment forms) attributes for
+    /// Check the #[doc="..."] (and the commment forms) attributes for
     /// spelling.
     fn check_doc_attrs(&mut self, attrs: &[Attribute]) {
         for attr in attrs.iter() {
@@ -91,7 +99,7 @@ impl SpellingVisitor {
         }
     }
 
-    /// Spellcheck the whole crate.
+    /// Spell-check a whole crate.
     pub fn check_crate(@mut self, crate: &Crate) {
         self.check_doc_attrs(crate.attrs);
         visit::visit_crate(self as @mut Visitor<()>, crate, ())

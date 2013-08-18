@@ -1,20 +1,24 @@
 use std::str;
 
-pub struct WordIter<'self> {
-    s: &'self str,
-    iter: str::CharOffsetIterator<'self>,
-    word_start: uint,
+/// Struct for the `subwords` iterator.
+pub struct SubwordIter<'self> {
+    priv s: &'self str,
+    priv iter: str::CharOffsetIterator<'self>,
+    priv word_start: uint,
 }
 
-pub fn words<'a>(s: &'a str) -> WordIter<'a> {
-    WordIter {
+/// Iterate over the "subwords" of a string, e.g. `FooBar` -> `Foo`,
+/// `Bar`; `foo_bar` -> `foo`, `bar`; `AB Cd123e` -> `A`, `B`, `Cd`,
+/// `e`.
+pub fn subwords<'a>(s: &'a str) -> SubwordIter<'a> {
+    SubwordIter {
         s: s,
         iter: s.char_offset_iter(),
         word_start: -1u
     }
 }
 
-impl<'self> Iterator<&'self str> for WordIter<'self> {
+impl<'self> Iterator<&'self str> for SubwordIter<'self> {
     fn next(&mut self) -> Option<&'self str> {
         let mut word_start = self.word_start;
         for (offset, c) in self.iter {
