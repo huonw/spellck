@@ -2,10 +2,10 @@
 
 A spell-checker for Rust code. Examines all<sup>1</sup> `pub` things
 like `mod`s, `fn`s, `struct`s and their fields, `enum`s and their
-variants, as well as their documentation their documentation for
-spelling errors.  It acts in a very naive way: just comparing the
-words with a dictionary, not even attempting stemming; by default just
-`/usr/share/dict/words`. It *doesn't* offer suggestions.
+variants, as well as their documentation for spelling errors.  It acts
+in a very naive way: just comparing the words with a dictionary, not
+even attempting stemming; by default just `/usr/share/dict/words`. It
+*doesn't* offer suggestions.
 
 It breaks idents like `foo_bar` and `FooBar` into `foo` and `bar`, and
 ignores any numbers/non-alphanumeric characters.
