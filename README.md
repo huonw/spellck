@@ -11,9 +11,11 @@ It breaks idents like `foo_bar` and `FooBar` into `foo` and `bar`, and
 ignores any numbers/non-alphanumeric characters.
 
 Compile with `rustc -O main.rs` (in theory it works with `rustpkg`
-too), and run with `./main path/to/crate.rs`. `stdlib.txt` is the
-words/abbreviations/sequences of letters from `std` and `extra` that
-are correct, but are not in my `/usr/share/dict/words`.
+too), and run with `./main path/to/crate.rs`.
+
+`self.txt` and `stdlib.txt` are the words/abbreviations/sequences of
+letters from `spellck` and `std` & `extra` respectively that are
+correct, but are not in my `/usr/share/dict/words`.
 
 Known to work with Rust commit 790e6bb.
 
