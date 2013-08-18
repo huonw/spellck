@@ -46,6 +46,7 @@ fn main() {
     // one visitor; the internal list of misspelled words gets reset
     // for each file, since the spans could conflict.
     let visitor = @mut visitor::SpellingVisitor::new(words);
+    let mut any_mistakes = false;
 
     for name in matches.free.iter() {
         let (cm, crate) = get_ast(Path(*name));
@@ -74,6 +75,8 @@ fn main() {
         // run through the spans, printing the words that are
         // apparently misspelled
         for Sort {sp, words} in pq.to_sorted_vec().move_iter() {
+            any_mistakes = true;
+
             let lines = cm.span_to_lines(sp);
             let sp_text = cm.span_to_str(sp);
 
@@ -95,6 +98,10 @@ fn main() {
             }
         }
     }
+
+    if any_mistakes {
+        os::set_exit_status(1)
+    }
 }
 
 /// Load each line of the file `p` into the given `Extendable` object.
@@ -108,7 +115,7 @@ fn read_lines_into<E: Extendable<~str>>
         }
         Err(s) => {
             io::stderr().write_line(fmt!("Error reading %s: %s", p.to_str(), s));
-            os::set_exit_status(1);
+            os::set_exit_status(10);
             false
         }
     }
