@@ -12,9 +12,9 @@ use words;
 
 /// Keeps track of the reference dictionary and the misspelled words
 /// through a traversal of the whole ast.
-pub struct SpellingVisitor {
+pub struct SpellingVisitor<'self> {
     /// The reference dictionary.
-    words: hashmap::HashSet<~str>,
+    words: &'self hashmap::HashSet<~str>,
     /// The misspelled words, indexed by the span on which they occur.
     misspellings: hashmap::HashMap<span, hashmap::HashSet<~str>>,
 
@@ -23,19 +23,14 @@ pub struct SpellingVisitor {
     doc_only: bool
 }
 
-impl SpellingVisitor {
+impl<'self> SpellingVisitor<'self> {
     /// Create a new Spelling Visitor.
-    pub fn new(words: hashmap::HashSet<~str>) -> SpellingVisitor {
+    pub fn new<'a>(words: &'a hashmap::HashSet<~str>) -> SpellingVisitor<'a> {
         SpellingVisitor {
             words: words,
             misspellings: hashmap::HashMap::new(),
             doc_only: false
         }
-    }
-
-    /// Clear the memory of misspellings
-    pub fn clear(&mut self) {
-        self.misspellings.clear()
     }
 
     /// Checks if the given string is a correct "word", without
@@ -100,24 +95,24 @@ impl SpellingVisitor {
     }
 
     /// Spell-check a whole crate.
-    pub fn check_crate(@mut self, crate: &Crate) {
+    pub fn check_crate(&mut self, crate: &Crate) {
         self.check_doc_attrs(crate.attrs);
-        visit::visit_crate(self as @mut Visitor<()>, crate, ())
+        visit::walk_crate(self, crate, ())
     }
 }
 
 // visits anything that could be visible to the outside world,
 // e.g. documentation, pub fns, pub mods etc and checks their
 // spelling.
-impl Visitor<()> for SpellingVisitor {
-    fn visit_mod(@mut self,
+impl<'self> Visitor<()> for SpellingVisitor<'self> {
+    fn visit_mod(&mut self,
                  module: &_mod,
                  _span: span,
                  _node_id: NodeId,
                  env: ()) {
-        visit::visit_mod(self as @mut Visitor<()>, module, env)
+        visit::walk_mod(self, module, env)
     }
-    fn visit_view_item(@mut self, view_item: &view_item, _env: ()) {
+    fn visit_view_item(&mut self, view_item: &view_item, _env: ()) {
         // only check the ident for `use self = foo;`; since there's
         // nothing else the user can do to control the name.
         if view_item.vis == public {
@@ -137,7 +132,7 @@ impl Visitor<()> for SpellingVisitor {
             }
         }
     }
-    fn visit_foreign_item(@mut self, foreign_item: @foreign_item, _env: ()) {
+    fn visit_foreign_item(&mut self, foreign_item: @foreign_item, _env: ()) {
         // don't check the ident; there's nothing the user can do to
         // control the name.
         if foreign_item.vis != private {
@@ -146,7 +141,7 @@ impl Visitor<()> for SpellingVisitor {
             self.check_doc_attrs(foreign_item.attrs);
         }
     }
-    fn visit_item(@mut self, item: @item, env: ()) {
+    fn visit_item(&mut self, item: @item, env: ()) {
         // no need to check the names/docs of private things
         // (although there may be public things inside them that
         // are re-exported somewhere else, so still recur). (Also,
@@ -179,7 +174,7 @@ impl Visitor<()> for SpellingVisitor {
                 }
             }
             item_mod(*) | item_foreign_mod(*) | item_struct(*) => {
-                visit::visit_item(self as @mut Visitor<()>, item, env)
+                visit::walk_item(self, item, env)
             }
             // impl Type { ... }
             item_impl(_, None, _, ref methods) => {
@@ -195,25 +190,25 @@ impl Visitor<()> for SpellingVisitor {
             item_impl(_, Some(*), _, _) => {
                 let old_d_o = self.doc_only;
                 self.doc_only = true;
-                visit::visit_item(self as @mut Visitor<()>, item, env);
+                visit::walk_item(self, item, env);
                 self.doc_only = old_d_o;
             }
             item_trait(*) if item.vis == public => {
-                visit::visit_item(self as @mut Visitor<()>, item, env)
+                visit::walk_item(self, item, env)
             }
             _ => {}
         }
     }
 
-    fn visit_ty_method(@mut self, method_type: &TypeMethod, env: ()) {
+    fn visit_ty_method(&mut self, method_type: &TypeMethod, env: ()) {
         self.check_doc_attrs(method_type.attrs);
         self.check_ident(method_type.ident, method_type.span);
-        visit::visit_ty_method(self as @mut Visitor<()>, method_type, env)
+        visit::walk_ty_method(self, method_type, env)
     }
-    fn visit_trait_method(@mut self, trait_method: &trait_method, env: ()) {
+    fn visit_trait_method(&mut self, trait_method: &trait_method, env: ()) {
         match *trait_method {
             required(_) => {
-                visit::visit_trait_method(self as @mut Visitor<()>, trait_method, env)
+                visit::walk_trait_method(self, trait_method, env)
             }
             provided(method) => {
                 self.check_doc_attrs(method.attrs);
@@ -222,20 +217,20 @@ impl Visitor<()> for SpellingVisitor {
         }
     }
 
-    fn visit_struct_def(@mut self,
+    fn visit_struct_def(&mut self,
                         struct_definition: @struct_def,
                         identifier: ident,
                         generics: &Generics,
                         node_id: NodeId,
                         env: ()) {
-        visit::visit_struct_def(self as @mut Visitor<()>,
+        visit::walk_struct_def(self,
                                 struct_definition,
                                 identifier,
                                 generics,
                                 node_id,
                                 env)
     }
-    fn visit_struct_field(@mut self, struct_field: @struct_field, _env: ()) {
+    fn visit_struct_field(&mut self, struct_field: @struct_field, _env: ()) {
         match struct_field.node.kind {
             named_field(id, vis) => {
                 match vis {
@@ -254,17 +249,17 @@ impl Visitor<()> for SpellingVisitor {
 
     /// we're only interested in top-level things, so we can just
     /// ignore these entirely.
-    fn visit_local(@mut self, _local: @Local, _env: ()) {}
-    fn visit_block(@mut self, _block: &Block, _env: ()) {}
-    fn visit_stmt(@mut self, _statement: @stmt, _env: ()) {}
-    fn visit_arm(@mut self, _arm: &arm, _env: ()) {}
-    fn visit_pat(@mut self, _pattern: @pat, _env: ()) {}
-    fn visit_decl(@mut self, _declaration: @decl, _env: ()) {}
-    fn visit_expr(@mut self, _expression: @expr, _env: ()) {}
-    fn visit_expr_post(@mut self, _expression: @expr, _: ()) {}
-    fn visit_ty(@mut self, _typ: &Ty, _env: ()) {}
-    fn visit_generics(@mut self, _generics: &Generics, _env: ()) {}
-    fn visit_fn(@mut self,
+    fn visit_local(&mut self, _local: @Local, _env: ()) {}
+    fn visit_block(&mut self, _block: &Block, _env: ()) {}
+    fn visit_stmt(&mut self, _statement: @stmt, _env: ()) {}
+    fn visit_arm(&mut self, _arm: &arm, _env: ()) {}
+    fn visit_pat(&mut self, _pattern: @pat, _env: ()) {}
+    fn visit_decl(&mut self, _declaration: @decl, _env: ()) {}
+    fn visit_expr(&mut self, _expression: @expr, _env: ()) {}
+    fn visit_expr_post(&mut self, _expression: @expr, _: ()) {}
+    fn visit_ty(&mut self, _typ: &Ty, _env: ()) {}
+    fn visit_generics(&mut self, _generics: &Generics, _env: ()) {}
+    fn visit_fn(&mut self,
                 _function_kind: &visit::fn_kind,
                 _function_declaration: &fn_decl,
                 _block: &Block,

@@ -45,13 +45,12 @@ fn main() {
 
     // one visitor; the internal list of misspelled words gets reset
     // for each file, since the spans could conflict.
-    let visitor = @mut visitor::SpellingVisitor::new(words);
     let mut any_mistakes = false;
 
     for name in matches.free.iter() {
         let (cm, crate) = get_ast(Path(*name));
 
-        visitor.clear();
+        let mut visitor = visitor::SpellingVisitor::new(&words);
         visitor.check_crate(crate);
 
         struct Sort<'self> {
@@ -146,7 +145,7 @@ fn get_ast(path: Path) -> (@codemap::CodeMap, @ast::Crate) {
                                       diagnostic::emit,
                                       span_diagnostic_handler);
 
-    let cfg = driver::build_configuration(sess, @"spellck", &input);
+    let cfg = driver::build_configuration(sess);
 
     let crate = driver::phase_1_parse_input(sess, cfg.clone(), &input);
 
