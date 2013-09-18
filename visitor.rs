@@ -4,7 +4,7 @@ use std::ascii::StrAsciiExt;
 use syntax::visit;
 use syntax::visit::Visitor;
 use syntax::parse::token;
-use syntax::codemap::span;
+use syntax::codemap::Span;
 use syntax::ast::*;
 use syntax::attr::AttrMetaMethods;
 
@@ -16,7 +16,7 @@ pub struct SpellingVisitor<'self> {
     /// The reference dictionary.
     words: &'self hashmap::HashSet<~str>,
     /// The misspelled words, indexed by the span on which they occur.
-    misspellings: hashmap::HashMap<span, hashmap::HashSet<~str>>,
+    misspellings: hashmap::HashMap<Span, hashmap::HashSet<~str>>,
 
     /// Whether the traversal should only check documentation, not
     /// idents; gets controlled internally, e.g. for `extern` blocks.
@@ -46,10 +46,10 @@ impl<'self> SpellingVisitor<'self> {
     /// and `FooBar` into `foo` & `bar` and `Foo` & `Bar`
     /// respectively. This inserts any incorrect word(s) into the
     /// misspelling map.
-    fn check_subwords(&mut self, w: &str, sp: span) {
+    fn check_subwords(&mut self, w: &str, sp: Span) {
         for w in words::subwords(w) {
             if !self.raw_word_is_correct(w) {
-                let insert = |_: &span, _: ()| {
+                let insert = |_: &Span, _: ()| {
                     let mut set = hashmap::HashSet::new();
                     set.insert(w.to_owned());
                     set
@@ -63,7 +63,7 @@ impl<'self> SpellingVisitor<'self> {
 
     /// Check a single ident for misspellings; possibly separating it
     /// into subwords.
-    fn check_ident(&mut self, id: ident, sp: span) {
+    fn check_ident(&mut self, id: Ident, sp: Span) {
         if self.doc_only { return }
 
         // spooky action at a distance; extracts the string
@@ -107,7 +107,7 @@ impl<'self> SpellingVisitor<'self> {
 impl<'self> Visitor<()> for SpellingVisitor<'self> {
     fn visit_mod(&mut self,
                  module: &_mod,
-                 _span: span,
+                 _span: Span,
                  _node_id: NodeId,
                  env: ()) {
         visit::walk_mod(self, module, env)
@@ -219,7 +219,7 @@ impl<'self> Visitor<()> for SpellingVisitor<'self> {
 
     fn visit_struct_def(&mut self,
                         struct_definition: @struct_def,
-                        identifier: ident,
+                        identifier: Ident,
                         generics: &Generics,
                         node_id: NodeId,
                         env: ()) {
@@ -251,19 +251,19 @@ impl<'self> Visitor<()> for SpellingVisitor<'self> {
     /// ignore these entirely.
     fn visit_local(&mut self, _local: @Local, _env: ()) {}
     fn visit_block(&mut self, _block: &Block, _env: ()) {}
-    fn visit_stmt(&mut self, _statement: @stmt, _env: ()) {}
-    fn visit_arm(&mut self, _arm: &arm, _env: ()) {}
-    fn visit_pat(&mut self, _pattern: @pat, _env: ()) {}
-    fn visit_decl(&mut self, _declaration: @decl, _env: ()) {}
-    fn visit_expr(&mut self, _expression: @expr, _env: ()) {}
-    fn visit_expr_post(&mut self, _expression: @expr, _: ()) {}
+    fn visit_stmt(&mut self, _statement: @Stmt, _env: ()) {}
+    fn visit_arm(&mut self, _arm: &Arm, _env: ()) {}
+    fn visit_pat(&mut self, _pattern: @Pat, _env: ()) {}
+    fn visit_decl(&mut self, _declaration: @Decl, _env: ()) {}
+    fn visit_expr(&mut self, _expression: @Expr, _env: ()) {}
+    fn visit_expr_post(&mut self, _expression: @Expr, _: ()) {}
     fn visit_ty(&mut self, _typ: &Ty, _env: ()) {}
     fn visit_generics(&mut self, _generics: &Generics, _env: ()) {}
     fn visit_fn(&mut self,
                 _function_kind: &visit::fn_kind,
                 _function_declaration: &fn_decl,
                 _block: &Block,
-                _span: span,
+                _span: Span,
                 _node_id: NodeId,
                 _env: ()) {}
 }

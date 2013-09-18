@@ -54,7 +54,7 @@ fn main() {
         visitor.check_crate(crate);
 
         struct Sort<'self> {
-            sp: codemap::span,
+            sp: codemap::Span,
             words: &'self HashSet<~str>
         }
         impl<'self> Ord for Sort<'self> {
