@@ -1,5 +1,7 @@
 # spellck
 
+[![Build Status](https://travis-ci.org/huonw/spellck.png)](https://travis-ci.org/huonw/spellck)
+
 A spell-checker for Rust code. Examines all<sup>1</sup> `pub` things
 like `mod`s, `fn`s, `struct`s and their fields, `enum`s and their
 variants, as well as their documentation for spelling errors.  It acts
