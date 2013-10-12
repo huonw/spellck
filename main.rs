@@ -14,7 +14,6 @@ mod visitor;
 static DEFAULT_DICT: &'static str = "/usr/share/dict/words";
 
 fn main() {
-    use extra::getopts;
     use extra::getopts::groups;
 
     let args = std::os::args();
@@ -24,20 +23,20 @@ fn main() {
                  groups::optflag("h", "help", "show this help message")];
 
     let matches = groups::getopts(args.tail(), opts).unwrap();
-    if getopts::opt_present(&matches, "h") || getopts::opt_present(&matches, "help") {
+    if matches.opt_present("h") || matches.opt_present("help") {
         println(groups::usage(args[0], opts));
         return;
     }
 
     let mut words = HashSet::new();
 
-    if !(getopts::opt_present(&matches, "n") ||
-         getopts::opt_present(&matches, "no-def-dict")) {
+    if !(matches.opt_present("n") ||
+         matches.opt_present("no-def-dict")) {
         if !read_lines_into(&Path(DEFAULT_DICT), &mut words) {
             return
         }
     }
-    for dict in getopts::opt_strs(&matches, "d").move_iter() {
+    for dict in matches.opt_strs("d").move_iter() {
         if !read_lines_into(&Path(dict), &mut words) {
             return
         }
@@ -51,7 +50,7 @@ fn main() {
         let (cm, crate) = get_ast(Path(*name));
 
         let mut visitor = visitor::SpellingVisitor::new(&words);
-        visitor.check_crate(crate);
+        visitor.check_crate(&crate);
 
         struct Sort<'self> {
             sp: codemap::Span,
@@ -79,19 +78,19 @@ fn main() {
             let lines = cm.span_to_lines(sp);
             let sp_text = cm.span_to_str(sp);
 
-            let ess = if words.len() == 1 {""} else {"s"};
-
             // [] required for connect :(
             let word_vec = words.iter().map(|s| s.as_slice()).to_owned_vec();
 
-            printfln!("%s: misspelled word%s: %s", sp_text, ess,
-                      word_vec.connect(", "));
+            println!("{}: misspelled {len, plural, =1{word} other{words}}: {}",
+                     sp_text,
+                     word_vec.connect(", "),
+                     len=words.len());
 
             // first line; no lines = no printing
             match lines.lines {
                 [line_num, .. _] => {
                     let line = lines.file.get_line(line_num as int);
-                    printfln!("%s: %s", sp_text, line);
+                    println!("{}: {}", sp_text, line);
                 }
                 _ => {}
             }
@@ -122,7 +121,7 @@ fn read_lines_into<E: Extendable<~str>>
 
 /// Extract the expanded ast of a crate, along with the codemap which
 /// connects source code locations to the actual code.
-fn get_ast(path: Path) -> (@codemap::CodeMap, @ast::Crate) {
+fn get_ast(path: Path) -> (@codemap::CodeMap, ast::Crate) {
     use rustc::driver::{driver, session};
     use syntax::diagnostic;
 
@@ -142,7 +141,7 @@ fn get_ast(path: Path) -> (@codemap::CodeMap, @ast::Crate) {
         diagnostic::mk_span_handler(diagnostic_handler, parsesess.cm);
 
     let sess = driver::build_session_(sessopts, parsesess.cm,
-                                      diagnostic::emit,
+                                      @diagnostic::DefaultEmitter as @diagnostic::Emitter,
                                       span_diagnostic_handler);
 
     let cfg = driver::build_configuration(sess);

@@ -1,11 +1,10 @@
 use std::hashmap;
 use std::ascii::StrAsciiExt;
 
-use syntax::visit;
+use syntax::{ast, visit};
 use syntax::visit::Visitor;
 use syntax::parse::token;
 use syntax::codemap::Span;
-use syntax::ast::*;
 use syntax::attr::AttrMetaMethods;
 
 use words;
@@ -24,7 +23,7 @@ pub struct SpellingVisitor<'self> {
 }
 
 impl<'self> SpellingVisitor<'self> {
-    /// Create a new Spelling Visitor.
+    /// ast::Create a new Spelling Visitor.
     pub fn new<'a>(words: &'a hashmap::HashSet<~str>) -> SpellingVisitor<'a> {
         SpellingVisitor {
             words: words,
@@ -63,7 +62,7 @@ impl<'self> SpellingVisitor<'self> {
 
     /// Check a single ident for misspellings; possibly separating it
     /// into subwords.
-    fn check_ident(&mut self, id: Ident, sp: Span) {
+    fn check_ident(&mut self, id: ast::Ident, sp: Span) {
         if self.doc_only { return }
 
         // spooky action at a distance; extracts the string
@@ -83,7 +82,7 @@ impl<'self> SpellingVisitor<'self> {
 
     /// Check the #[doc="..."] (and the commment forms) attributes for
     /// spelling.
-    fn check_doc_attrs(&mut self, attrs: &[Attribute]) {
+    fn check_doc_attrs(&mut self, attrs: &[ast::Attribute]) {
         for attr in attrs.iter() {
             match attr.name_str_pair() {
                 Some((doc, doc_str)) if "doc" == doc => {
@@ -95,7 +94,7 @@ impl<'self> SpellingVisitor<'self> {
     }
 
     /// Spell-check a whole crate.
-    pub fn check_crate(&mut self, crate: &Crate) {
+    pub fn check_crate(&mut self, crate: &ast::Crate) {
         self.check_doc_attrs(crate.attrs);
         visit::walk_crate(self, crate, ())
     }
@@ -106,52 +105,52 @@ impl<'self> SpellingVisitor<'self> {
 // spelling.
 impl<'self> Visitor<()> for SpellingVisitor<'self> {
     fn visit_mod(&mut self,
-                 module: &_mod,
+                 module: &ast::_mod,
                  _span: Span,
-                 _node_id: NodeId,
+                 _node_id: ast::NodeId,
                  env: ()) {
         visit::walk_mod(self, module, env)
     }
-    fn visit_view_item(&mut self, view_item: &view_item, _env: ()) {
+    fn visit_view_item(&mut self, view_item: &ast::view_item, _env: ()) {
         // only check the ident for `use self = foo;`; since there's
         // nothing else the user can do to control the name.
-        if view_item.vis == public {
+        if view_item.vis == ast::public {
             self.check_doc_attrs(view_item.attrs);
             match view_item.node {
-                view_item_use(ref vps) => {
+                ast::view_item_use(ref vps) => {
                     for &vp in vps.iter() {
                         match vp.node {
-                            view_path_simple(id, _, _) => {
+                            ast::view_path_simple(id, _, _) => {
                                 self.check_ident(id, vp.span);
                             }
                             _ => {}
                         }
                     }
                 }
-                view_item_extern_mod(*) => {}
+                ast::view_item_extern_mod(*) => {}
             }
         }
     }
-    fn visit_foreign_item(&mut self, foreign_item: @foreign_item, _env: ()) {
+    fn visit_foreign_item(&mut self, foreign_item: @ast::foreign_item, _env: ()) {
         // don't check the ident; there's nothing the user can do to
         // control the name.
-        if foreign_item.vis != private {
+        if foreign_item.vis != ast::private {
             // (the visibility rules seems to be strange here, pub is
             // just ignored)
             self.check_doc_attrs(foreign_item.attrs);
         }
     }
-    fn visit_item(&mut self, item: @item, env: ()) {
-        // no need to check the names/docs of private things
-        // (although there may be public things inside them that
+    fn visit_item(&mut self, item: @ast::item, env: ()) {
+        // no need to check the names/docs of ast::private things
+        // (although there may be ast::public things inside them that
         // are re-exported somewhere else, so still recur). (Also,
-        // all(?) items inherit private visibility.)
-        let should_check_doc = item.vis == public || match item.node {
-            item_impl(*) => true,
+        // all(?) items inherit ast::private visibility.)
+        let should_check_doc = item.vis == ast::public || match item.node {
+            ast::item_impl(*) => true,
             _ => false
         };
 
-        if item.vis == public {
+        if item.vis == ast::public {
             self.check_ident(item.ident, item.span);
         }
         if should_check_doc {
@@ -162,10 +161,10 @@ impl<'self> Visitor<()> for SpellingVisitor<'self> {
             // no visitor method for enum variants so have to do it by
             // hand. This is probably (subtly or otherwise) incorrect
             // wrt to visibility.
-            item_enum(ref ed, _) => {
+            ast::item_enum(ref ed, _) => {
                 for var in ed.variants.iter() {
-                    let no_check = var.node.vis == private ||
-                        (var.node.vis == inherited && item.vis != public);
+                    let no_check = var.node.vis == ast::private ||
+                        (var.node.vis == ast::inherited && item.vis != ast::public);
 
                     if !no_check {
                         self.check_ident(var.node.name, var.span);
@@ -173,13 +172,13 @@ impl<'self> Visitor<()> for SpellingVisitor<'self> {
                     }
                 }
             }
-            item_mod(*) | item_foreign_mod(*) | item_struct(*) => {
+            ast::item_mod(*) | ast::item_foreign_mod(*) | ast::item_struct(*) => {
                 visit::walk_item(self, item, env)
             }
             // impl Type { ... }
-            item_impl(_, None, _, ref methods) => {
+            ast::item_impl(_, None, _, ref methods) => {
                 for &method in methods.iter() {
-                    if method.vis == public {
+                    if method.vis == ast::public {
                         self.check_ident(method.ident, method.span);
                         self.check_doc_attrs(method.attrs);
                     }
@@ -187,30 +186,30 @@ impl<'self> Visitor<()> for SpellingVisitor<'self> {
             }
             // impl Trait for Type { ... }, only check the docs, the
             // method names come from elsewhere.
-            item_impl(_, Some(*), _, _) => {
+            ast::item_impl(_, Some(*), _, _) => {
                 let old_d_o = self.doc_only;
                 self.doc_only = true;
                 visit::walk_item(self, item, env);
                 self.doc_only = old_d_o;
             }
-            item_trait(*) if item.vis == public => {
+            ast::item_trait(*) if item.vis == ast::public => {
                 visit::walk_item(self, item, env)
             }
             _ => {}
         }
     }
 
-    fn visit_ty_method(&mut self, method_type: &TypeMethod, env: ()) {
+    fn visit_ty_method(&mut self, method_type: &ast::TypeMethod, env: ()) {
         self.check_doc_attrs(method_type.attrs);
         self.check_ident(method_type.ident, method_type.span);
         visit::walk_ty_method(self, method_type, env)
     }
-    fn visit_trait_method(&mut self, trait_method: &trait_method, env: ()) {
+    fn visit_trait_method(&mut self, trait_method: &ast::trait_method, env: ()) {
         match *trait_method {
-            required(_) => {
+            ast::required(_) => {
                 visit::walk_trait_method(self, trait_method, env)
             }
-            provided(method) => {
+            ast::provided(method) => {
                 self.check_doc_attrs(method.attrs);
                 self.check_ident(method.ident, method.span);
             }
@@ -218,30 +217,30 @@ impl<'self> Visitor<()> for SpellingVisitor<'self> {
     }
 
     fn visit_struct_def(&mut self,
-                        struct_definition: @struct_def,
-                        identifier: Ident,
-                        generics: &Generics,
-                        node_id: NodeId,
+                        struct_definition: @ast::struct_def,
+                        identifier: ast::Ident,
+                        generics: &ast::Generics,
+                        node_id: ast::NodeId,
                         env: ()) {
         visit::walk_struct_def(self,
-                                struct_definition,
-                                identifier,
-                                generics,
-                                node_id,
-                                env)
+                               struct_definition,
+                               identifier,
+                               generics,
+                               node_id,
+                               env)
     }
-    fn visit_struct_field(&mut self, struct_field: @struct_field, _env: ()) {
+    fn visit_struct_field(&mut self, struct_field: @ast::struct_field, _env: ()) {
         match struct_field.node.kind {
-            named_field(id, vis) => {
+            ast::named_field(id, vis) => {
                 match vis {
-                    public | inherited => {
+                    ast::public | ast::inherited => {
                         self.check_ident(id, struct_field.span);
                         self.check_doc_attrs(struct_field.node.attrs);
                     }
-                    private => {}
+                    ast::private => {}
                 }
             }
-            unnamed_field => {}
+            ast::unnamed_field => {}
         }
 
         // no need to recur; nothing below this level to check.
@@ -249,21 +248,21 @@ impl<'self> Visitor<()> for SpellingVisitor<'self> {
 
     /// we're only interested in top-level things, so we can just
     /// ignore these entirely.
-    fn visit_local(&mut self, _local: @Local, _env: ()) {}
-    fn visit_block(&mut self, _block: &Block, _env: ()) {}
-    fn visit_stmt(&mut self, _statement: @Stmt, _env: ()) {}
-    fn visit_arm(&mut self, _arm: &Arm, _env: ()) {}
-    fn visit_pat(&mut self, _pattern: @Pat, _env: ()) {}
-    fn visit_decl(&mut self, _declaration: @Decl, _env: ()) {}
-    fn visit_expr(&mut self, _expression: @Expr, _env: ()) {}
-    fn visit_expr_post(&mut self, _expression: @Expr, _: ()) {}
-    fn visit_ty(&mut self, _typ: &Ty, _env: ()) {}
-    fn visit_generics(&mut self, _generics: &Generics, _env: ()) {}
+    fn visit_local(&mut self, _local: @ast::Local, _env: ()) {}
+    fn visit_block(&mut self, _block: &ast::Block, _env: ()) {}
+    fn visit_stmt(&mut self, _statement: @ast::Stmt, _env: ()) {}
+    fn visit_arm(&mut self, _arm: &ast::Arm, _env: ()) {}
+    fn visit_pat(&mut self, _pattern: @ast::Pat, _env: ()) {}
+    fn visit_decl(&mut self, _declaration: @ast::Decl, _env: ()) {}
+    fn visit_expr(&mut self, _expression: @ast::Expr, _env: ()) {}
+    fn visit_expr_post(&mut self, _expression: @ast::Expr, _: ()) {}
+    fn visit_ty(&mut self, _typ: &ast::Ty, _env: ()) {}
+    fn visit_generics(&mut self, _generics: &ast::Generics, _env: ()) {}
     fn visit_fn(&mut self,
                 _function_kind: &visit::fn_kind,
-                _function_declaration: &fn_decl,
-                _block: &Block,
+                _function_declaration: &ast::fn_decl,
+                _block: &ast::Block,
                 _span: Span,
-                _node_id: NodeId,
+                _node_id: ast::NodeId,
                 _env: ()) {}
 }

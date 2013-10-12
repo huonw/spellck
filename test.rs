@@ -95,3 +95,7 @@ pub fn yeslklkdlkf() {
 
 /// noblahblahblah
 fn nodfjskdfj() {}
+
+
+/// yesttttttttt bbbbbbbbb
+pub fn yestttttt_blahhhhh() {}

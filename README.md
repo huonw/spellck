@@ -17,7 +17,7 @@ too), and run with `./main path/to/crate.rs`.
 letters from `spellck` and `std` & `extra` respectively that are
 correct, but are not in my `/usr/share/dict/words`.
 
-Known to work with Rust commit d2b0b11.
+Known to work with Rust commit cac525dd.
 
 <sup>1</sup> Not guaranteed; Rust's privacy rules are non-obvious, and are
 currently buggy anyway.
