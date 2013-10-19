@@ -1,3 +1,5 @@
+//! Utilities for iterating over the "words" in a string.
+
 use std::str;
 
 /// Struct for the `subwords` iterator.
@@ -54,6 +56,6 @@ impl<'self> Iterator<&'self str> for SubwordIter<'self> {
 fn test_words() {
     let s = "Foo_barBazÄåöAB123C";
 
-    assert_eq!(words(s).to_owned_vec(),
+    assert_eq!(subwords(s).to_owned_vec(),
                ~["Foo", "bar", "Baz", "Äåö", "A", "B", "C"]);
 }

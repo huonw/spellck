@@ -32,12 +32,12 @@ fn main() {
 
     if !(matches.opt_present("n") ||
          matches.opt_present("no-def-dict")) {
-        if !read_lines_into(&Path(DEFAULT_DICT), &mut words) {
+        if !read_lines_into(&Path::new(DEFAULT_DICT), &mut words) {
             return
         }
     }
     for dict in matches.opt_strs("d").move_iter() {
-        if !read_lines_into(&Path(dict), &mut words) {
+        if !read_lines_into(&Path::new(dict), &mut words) {
             return
         }
     }
@@ -47,7 +47,7 @@ fn main() {
     let mut any_mistakes = false;
 
     for name in matches.free.iter() {
-        let (cm, crate) = get_ast(Path(*name));
+        let (cm, crate) = get_ast(Path::new(name.as_slice()));
 
         let mut visitor = visitor::SpellingVisitor::new(&words);
         visitor.check_crate(&crate);
@@ -112,7 +112,7 @@ fn read_lines_into<E: Extendable<~str>>
             true
         }
         Err(s) => {
-            io::stderr().write_line(fmt!("Error reading %s: %s", p.to_str(), s));
+            io::stderr().write_line(format!("Error reading {}: {}", p.display(), s));
             os::set_exit_status(10);
             false
         }
@@ -131,7 +131,6 @@ fn get_ast(path: Path) -> (@codemap::CodeMap, ast::Crate) {
 
     let sessopts = @session::options {
         binary: @"spellck",
-        maybe_sysroot: Some(@os::self_exe_path().unwrap().pop()),
         .. (*session::basic_options()).clone()
     };
 

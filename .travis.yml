@@ -5,3 +5,5 @@ install:
   - sudo apt-get install rust-nightly
 script:
   - rustc main.rs
+  - rustc --test main.rs -o tester
+  - ./tester
