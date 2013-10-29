@@ -1,9 +1,12 @@
 #[deny(missing_doc)];
+#[feature(managed_boxes)];
 
 extern mod extra;
 extern mod syntax;
 extern mod rustc;
-use std::{io, os};
+use std::{os, str};
+use std::rt::io;
+use std::rt::io::{Reader, file};
 use std::hashmap::HashSet;
 use extra::priority_queue;
 use syntax::{ast, codemap};
@@ -105,14 +108,15 @@ fn main() {
 /// Load each line of the file `p` into the given `Extendable` object.
 fn read_lines_into<E: Extendable<~str>>
                   (p: &Path, e: &mut E) -> bool {
-    match io::file_reader(p) {
-        Ok(r) => {
-            let r = r.read_lines();
-            e.extend(&mut r.move_iter());
+    match file::open(p, io::Open, io::Read) {
+        Some(mut r) => {
+            let r = r.read_to_end();
+            let s = str::from_utf8_owned(r);
+            e.extend(&mut s.line_iter().map(|ss| ss.to_owned()));
             true
         }
-        Err(s) => {
-            io::stderr().write_line(format!("Error reading {}: {}", p.display(), s));
+        None => {
+            // io::stderr().write_line(format!("Error reading {}: {}", p.display(), s));
             os::set_exit_status(10);
             false
         }
