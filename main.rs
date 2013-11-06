@@ -6,7 +6,7 @@ extern mod syntax;
 extern mod rustc;
 use std::{os, str};
 use std::rt::io;
-use std::rt::io::{Reader, file};
+use std::rt::io::{Reader, File};
 use std::hashmap::HashSet;
 use extra::priority_queue;
 use syntax::{ast, codemap};
@@ -108,15 +108,17 @@ fn main() {
 /// Load each line of the file `p` into the given `Extendable` object.
 fn read_lines_into<E: Extendable<~str>>
                   (p: &Path, e: &mut E) -> bool {
-    match file::open(p, io::Open, io::Read) {
-        Some(mut r) => {
+    match io::result(|| File::open(p)) {
+        Ok(Some(mut r)) => {
             let r = r.read_to_end();
             let s = str::from_utf8_owned(r);
             e.extend(&mut s.line_iter().map(|ss| ss.to_owned()));
             true
         }
-        None => {
-            // io::stderr().write_line(format!("Error reading {}: {}", p.display(), s));
+        Ok(None) => fail!("impossible?"),
+        Err(e) => {
+            write!(&mut io::stderr() as &mut Writer,
+                   "Error reading {}: {}", p.display(), e.to_str());
             os::set_exit_status(10);
             false
         }
