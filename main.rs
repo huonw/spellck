@@ -24,20 +24,19 @@ fn main() {
                  groups::optflag("h", "help", "show this help message")];
 
     let matches = groups::getopts(args.tail(), opts).unwrap();
-    if matches.opt_present("h") || matches.opt_present("help") {
+    if matches.opts_present([~"h", ~"help"]) {
         println(groups::usage(args[0], opts));
         return;
     }
 
     let mut words = HashSet::new();
 
-    if !(matches.opt_present("n") ||
-         matches.opt_present("no-def-dict")) {
+    if !matches.opts_present([~"n", ~"no-def-dict"]) {
         if !read_lines_into(&Path::new(DEFAULT_DICT), &mut words) {
             return
         }
     }
-    for dict in matches.opt_strs("d").move_iter() {
+    for dict in matches.opt_strs("d").move_iter().chain(matches.opt_strs("dict").move_iter()) {
         if !read_lines_into(&Path::new(dict), &mut words) {
             return
         }
