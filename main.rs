@@ -4,9 +4,7 @@
 extern mod extra;
 extern mod syntax;
 extern mod rustc;
-use std::{os, str};
-use std::rt::io;
-use std::rt::io::{Reader, File};
+use std::{io, os, str};
 use std::hashmap::HashSet;
 use extra::priority_queue;
 use syntax::{ast, codemap};
@@ -108,7 +106,7 @@ fn main() {
 /// Load each line of the file `p` into the given `Extendable` object.
 fn read_lines_into<E: Extendable<~str>>
                   (p: &Path, e: &mut E) -> bool {
-    match io::result(|| File::open(p)) {
+    match io::result(|| io::File::open(p)) {
         Ok(Some(mut r)) => {
             let r = r.read_to_end();
             let s = str::from_utf8_owned(r);
