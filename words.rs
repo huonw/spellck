@@ -15,7 +15,7 @@ pub struct SubwordIter<'self> {
 pub fn subwords<'a>(s: &'a str) -> SubwordIter<'a> {
     SubwordIter {
         s: s,
-        iter: s.char_offset_iter(),
+        iter: s.char_indices(),
         word_start: -1u
     }
 }

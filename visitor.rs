@@ -37,7 +37,7 @@ impl<'self> SpellingVisitor<'self> {
     /// is automatically considered a proper word.
     fn raw_word_is_correct(&mut self, w: &str) -> bool {
         self.words.contains_equiv(&w) ||
-            !w.iter().all(|c| c.is_alphabetic()) ||
+            !w.chars().all(|c| c.is_alphabetic()) ||
             self.words.contains_equiv(&w.to_ascii_lower())
     }
 
@@ -127,7 +127,7 @@ impl<'self> Visitor<()> for SpellingVisitor<'self> {
                         }
                     }
                 }
-                ast::view_item_extern_mod(*) => {}
+                ast::view_item_extern_mod(..) => {}
             }
         }
     }
@@ -146,7 +146,7 @@ impl<'self> Visitor<()> for SpellingVisitor<'self> {
         // are re-exported somewhere else, so still recur). (Also,
         // all(?) items inherit ast::private visibility.)
         let should_check_doc = item.vis == ast::public || match item.node {
-            ast::item_impl(*) => true,
+            ast::item_impl(..) => true,
             _ => false
         };
 
@@ -172,7 +172,7 @@ impl<'self> Visitor<()> for SpellingVisitor<'self> {
                     }
                 }
             }
-            ast::item_mod(*) | ast::item_foreign_mod(*) | ast::item_struct(*) => {
+            ast::item_mod(..) | ast::item_foreign_mod(..) | ast::item_struct(..) => {
                 visit::walk_item(self, item, env)
             }
             // impl Type { ... }
@@ -186,13 +186,13 @@ impl<'self> Visitor<()> for SpellingVisitor<'self> {
             }
             // impl Trait for Type { ... }, only check the docs, the
             // method names come from elsewhere.
-            ast::item_impl(_, Some(*), _, _) => {
+            ast::item_impl(_, Some(..), _, _) => {
                 let old_d_o = self.doc_only;
                 self.doc_only = true;
                 visit::walk_item(self, item, env);
                 self.doc_only = old_d_o;
             }
-            ast::item_trait(*) if item.vis == ast::public => {
+            ast::item_trait(..) if item.vis == ast::public => {
                 visit::walk_item(self, item, env)
             }
             _ => {}
@@ -229,7 +229,7 @@ impl<'self> Visitor<()> for SpellingVisitor<'self> {
                                node_id,
                                env)
     }
-    fn visit_struct_field(&mut self, struct_field: @ast::struct_field, _env: ()) {
+    fn visit_struct_field(&mut self, struct_field: &ast::struct_field, _env: ()) {
         match struct_field.node.kind {
             ast::named_field(id, vis) => {
                 match vis {
@@ -249,10 +249,10 @@ impl<'self> Visitor<()> for SpellingVisitor<'self> {
     /// we're only interested in top-level things, so we can just
     /// ignore these entirely.
     fn visit_local(&mut self, _local: @ast::Local, _env: ()) {}
-    fn visit_block(&mut self, _block: &ast::Block, _env: ()) {}
+    fn visit_block(&mut self, _block: @ast::Block, _env: ()) {}
     fn visit_stmt(&mut self, _statement: @ast::Stmt, _env: ()) {}
     fn visit_arm(&mut self, _arm: &ast::Arm, _env: ()) {}
-    fn visit_pat(&mut self, _pattern: @ast::Pat, _env: ()) {}
+    fn visit_pat(&mut self, _pattern: &ast::Pat, _env: ()) {}
     fn visit_decl(&mut self, _declaration: @ast::Decl, _env: ()) {}
     fn visit_expr(&mut self, _expression: @ast::Expr, _env: ()) {}
     fn visit_expr_post(&mut self, _expression: @ast::Expr, _: ()) {}
@@ -261,7 +261,7 @@ impl<'self> Visitor<()> for SpellingVisitor<'self> {
     fn visit_fn(&mut self,
                 _function_kind: &visit::fn_kind,
                 _function_declaration: &ast::fn_decl,
-                _block: &ast::Block,
+                _block: @ast::Block,
                 _span: Span,
                 _node_id: ast::NodeId,
                 _env: ()) {}

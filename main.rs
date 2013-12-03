@@ -32,12 +32,12 @@ fn main() {
     let mut words = HashSet::new();
 
     if !matches.opts_present([~"n", ~"no-def-dict"]) {
-        if !read_lines_into(&Path::new(DEFAULT_DICT), &mut words) {
+        if !read_lines_into(&Path::init(DEFAULT_DICT), &mut words) {
             return
         }
     }
     for dict in matches.opt_strs("d").move_iter().chain(matches.opt_strs("dict").move_iter()) {
-        if !read_lines_into(&Path::new(dict), &mut words) {
+        if !read_lines_into(&Path::init(dict), &mut words) {
             return
         }
     }
@@ -47,7 +47,7 @@ fn main() {
     let mut any_mistakes = false;
 
     for name in matches.free.iter() {
-        let (cm, crate) = get_ast(Path::new(name.as_slice()));
+        let (cm, crate) = get_ast(Path::init(name.as_slice()));
 
         let mut visitor = visitor::SpellingVisitor::new(&words);
         visitor.check_crate(&crate);
@@ -66,9 +66,7 @@ fn main() {
         // extract the lines in order of the spans, so that e.g. files
         // are grouped together, and lines occur in increasing order.
         let pq: priority_queue::PriorityQueue<Sort> =
-            do visitor.misspellings.iter().map |(k, v)| {
-                Sort { sp: *k, words: v }
-            }.collect();
+            visitor.misspellings.iter().map(|(k, v)| Sort { sp: *k, words: v }).collect();
 
         // run through the spans, printing the words that are
         // apparently misspelled
@@ -88,7 +86,7 @@ fn main() {
 
             // first line; no lines = no printing
             match lines.lines {
-                [line_num, .. _] => {
+                [line_num, ..] => {
                     let line = lines.file.get_line(line_num as int);
                     println!("{}: {}", sp_text, line);
                 }
@@ -109,7 +107,7 @@ fn read_lines_into<E: Extendable<~str>>
         Ok(Some(mut r)) => {
             let r = r.read_to_end();
             let s = str::from_utf8_owned(r);
-            e.extend(&mut s.line_iter().map(|ss| ss.to_owned()));
+            e.extend(&mut s.lines().map(|ss| ss.to_owned()));
             true
         }
         Ok(None) => fail!("impossible?"),
