@@ -11,9 +11,9 @@ use words;
 
 /// Keeps track of the reference dictionary and the misspelled words
 /// through a traversal of the whole ast.
-pub struct SpellingVisitor<'self> {
+pub struct SpellingVisitor<'a> {
     /// The reference dictionary.
-    words: &'self hashmap::HashSet<~str>,
+    words: &'a hashmap::HashSet<~str>,
     /// The misspelled words, indexed by the span on which they occur.
     misspellings: hashmap::HashMap<Span, hashmap::HashSet<~str>>,
 
@@ -22,7 +22,7 @@ pub struct SpellingVisitor<'self> {
     doc_only: bool
 }
 
-impl<'self> SpellingVisitor<'self> {
+impl<'a> SpellingVisitor<'a> {
     /// ast::Create a new Spelling Visitor.
     pub fn new<'a>(words: &'a hashmap::HashSet<~str>) -> SpellingVisitor<'a> {
         SpellingVisitor {
@@ -103,7 +103,7 @@ impl<'self> SpellingVisitor<'self> {
 // visits anything that could be visible to the outside world,
 // e.g. documentation, pub fns, pub mods etc and checks their
 // spelling.
-impl<'self> Visitor<()> for SpellingVisitor<'self> {
+impl<'a> Visitor<()> for SpellingVisitor<'a> {
     fn visit_mod(&mut self,
                  module: &ast::_mod,
                  _span: Span,

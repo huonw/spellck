@@ -3,9 +3,9 @@
 use std::str;
 
 /// Struct for the `subwords` iterator.
-pub struct SubwordIter<'self> {
-    priv s: &'self str,
-    priv iter: str::CharOffsetIterator<'self>,
+pub struct SubwordIter<'a> {
+    priv s: &'a str,
+    priv iter: str::CharOffsetIterator<'a>,
     priv word_start: uint,
 }
 
@@ -20,8 +20,8 @@ pub fn subwords<'a>(s: &'a str) -> SubwordIter<'a> {
     }
 }
 
-impl<'self> Iterator<&'self str> for SubwordIter<'self> {
-    fn next(&mut self) -> Option<&'self str> {
+impl<'a> Iterator<&'a str> for SubwordIter<'a> {
+    fn next(&mut self) -> Option<&'a str> {
         let mut word_start = self.word_start;
         for (offset, c) in self.iter {
             // skip leading non-alphabetic characters

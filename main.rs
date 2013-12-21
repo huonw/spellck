@@ -1,6 +1,9 @@
 #[deny(missing_doc)];
 #[feature(managed_boxes)];
 
+//! Prints the misspelled words in the public documentation &
+//! identifiers of a crate.
+
 extern mod extra;
 extern mod syntax;
 extern mod rustc;
@@ -32,12 +35,12 @@ fn main() {
     let mut words = HashSet::new();
 
     if !matches.opts_present([~"n", ~"no-def-dict"]) {
-        if !read_lines_into(&Path::init(DEFAULT_DICT), &mut words) {
+        if !read_lines_into(&Path::new(DEFAULT_DICT), &mut words) {
             return
         }
     }
     for dict in matches.opt_strs("d").move_iter().chain(matches.opt_strs("dict").move_iter()) {
-        if !read_lines_into(&Path::init(dict), &mut words) {
+        if !read_lines_into(&Path::new(dict), &mut words) {
             return
         }
     }
@@ -47,17 +50,17 @@ fn main() {
     let mut any_mistakes = false;
 
     for name in matches.free.iter() {
-        let (cm, crate) = get_ast(Path::init(name.as_slice()));
+        let (cm, crate) = get_ast(Path::new(name.as_slice()));
 
         let mut visitor = visitor::SpellingVisitor::new(&words);
         visitor.check_crate(&crate);
 
-        struct Sort<'self> {
+        struct Sort<'a> {
             sp: codemap::Span,
-            words: &'self HashSet<~str>
+            words: &'a HashSet<~str>
         }
-        impl<'self> Ord for Sort<'self> {
-            fn lt(&self, other: &Sort<'self>) -> bool {
+        impl<'a> Ord for Sort<'a> {
+            fn lt(&self, other: &Sort<'a>) -> bool {
                 self.sp.lo < other.sp.lo ||
                     (self.sp.lo == other.sp.lo && self.sp.hi < other.sp.hi)
             }
