@@ -28,7 +28,7 @@ fn main() {
 
     let matches = groups::getopts(args.tail(), opts).unwrap();
     if matches.opts_present([~"h", ~"help"]) {
-        println(groups::usage(args[0], opts));
+        println!("{}", groups::usage(args[0], opts));
         return;
     }
 
@@ -134,7 +134,7 @@ fn get_ast(path: Path) -> (@codemap::CodeMap, ast::Crate) {
     let input = driver::file_input(path);
 
     let sessopts = @session::options {
-        binary: @"spellck",
+        binary: ~"spellck",
         .. (*session::basic_options()).clone()
     };
 
@@ -152,5 +152,5 @@ fn get_ast(path: Path) -> (@codemap::CodeMap, ast::Crate) {
     let crate = driver::phase_1_parse_input(sess, cfg.clone(), &input);
 
     (parsesess.cm,
-     driver::phase_2_configure_and_expand(sess, cfg, crate))
+     driver::phase_2_configure_and_expand(sess, cfg, crate).n0())
 }
