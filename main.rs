@@ -1,3 +1,4 @@
+#[crate_id="spellck"];
 #[deny(missing_doc)];
 #[feature(managed_boxes)];
 
