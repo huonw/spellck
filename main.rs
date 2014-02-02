@@ -109,8 +109,8 @@ fn read_lines_into<E: Extendable<~str>>
                   (p: &Path, e: &mut E) -> bool {
     match io::result(|| io::File::open(p)) {
         Ok(Some(mut r)) => {
-            let r = r.read_to_end();
-            let s = str::from_utf8_owned(r);
+            let s = str::from_utf8_owned(r.read_to_end())
+                .expect(format!("{} is not UTF-8", p.display()));
             e.extend(&mut s.lines().map(|ss| ss.to_owned()));
             true
         }
@@ -132,9 +132,9 @@ fn get_ast(path: Path) -> (@codemap::CodeMap, ast::Crate) {
 
     // cargo culted from rustdoc_ng :(
     let parsesess = syntax::parse::new_parse_sess(None);
-    let input = driver::file_input(path);
+    let input = driver::FileInput(path);
 
-    let sessopts = @session::options {
+    let sessopts = @session::Options {
         binary: ~"spellck",
         .. (*session::basic_options()).clone()
     };
@@ -144,14 +144,14 @@ fn get_ast(path: Path) -> (@codemap::CodeMap, ast::Crate) {
     let span_diagnostic_handler =
         diagnostic::mk_span_handler(diagnostic_handler, parsesess.cm);
 
-    let sess = driver::build_session_(sessopts, parsesess.cm,
+    let sess = driver::build_session_(sessopts, None, parsesess.cm,
                                       @diagnostic::DefaultEmitter as @diagnostic::Emitter,
                                       span_diagnostic_handler);
 
     let cfg = driver::build_configuration(sess);
 
     let crate = driver::phase_1_parse_input(sess, cfg.clone(), &input);
-
+    let loader = &mut rustc::metadata::creader::Loader::new(sess);
     (parsesess.cm,
-     driver::phase_2_configure_and_expand(sess, cfg, crate).n0())
+     driver::phase_2_configure_and_expand(sess, cfg, loader, crate).n0())
 }

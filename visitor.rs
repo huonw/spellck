@@ -67,7 +67,8 @@ impl<'a> SpellingVisitor<'a> {
 
         // spooky action at a distance; extracts the string
         // representation from TLS.
-        let word = token::ident_to_str(&id);
+        let word_ = token::get_ident(id.name);
+        let word = word_.get();
         // secret rust internals, e.g. __std_macros
         if word.starts_with("__") { return }
 
@@ -85,8 +86,8 @@ impl<'a> SpellingVisitor<'a> {
     fn check_doc_attrs(&mut self, attrs: &[ast::Attribute]) {
         for attr in attrs.iter() {
             match attr.name_str_pair() {
-                Some((doc, doc_str)) if "doc" == doc => {
-                    self.check_subwords(doc_str, attr.span);
+                Some((ref doc, ref doc_str)) if "doc" == doc.get() => {
+                    self.check_subwords(doc_str.get(), attr.span);
                 }
                 _ => {}
             }
