@@ -5,12 +5,13 @@
 //! Prints the misspelled words in the public documentation &
 //! identifiers of a crate.
 
-extern mod extra;
+extern mod collections;
+extern mod getopts;
 extern mod syntax;
 extern mod rustc;
 use std::{io, os, str};
 use std::hashmap::HashSet;
-use extra::priority_queue;
+use collections::priority_queue;
 use syntax::{ast, codemap};
 
 pub mod words;
@@ -19,17 +20,15 @@ mod visitor;
 static DEFAULT_DICT: &'static str = "/usr/share/dict/words";
 
 fn main() {
-    use extra::getopts::groups;
-
     let args = std::os::args();
-    let opts = ~[groups::optmulti("d", "dict",
+    let opts = ~[getopts::optmulti("d", "dict",
                                   "dictionary file (a list of words, one per line)", "PATH"),
-                 groups::optflag("n", "no-def-dict", "don't use the default dictionary"),
-                 groups::optflag("h", "help", "show this help message")];
+                 getopts::optflag("n", "no-def-dict", "don't use the default dictionary"),
+                 getopts::optflag("h", "help", "show this help message")];
 
-    let matches = groups::getopts(args.tail(), opts).unwrap();
+    let matches = getopts::getopts(args.tail(), opts).unwrap();
     if matches.opts_present([~"h", ~"help"]) {
-        println!("{}", groups::usage(args[0], opts));
+        println!("{}", getopts::usage(args[0], opts));
         return;
     }
 
@@ -107,17 +106,16 @@ fn main() {
 /// Load each line of the file `p` into the given `Extendable` object.
 fn read_lines_into<E: Extendable<~str>>
                   (p: &Path, e: &mut E) -> bool {
-    match io::result(|| io::File::open(p)) {
-        Ok(Some(mut r)) => {
-            let s = str::from_utf8_owned(r.read_to_end())
+    match io::File::open(p) {
+        Ok(mut r) => {
+            let s = str::from_utf8_owned(r.read_to_end().unwrap())
                 .expect(format!("{} is not UTF-8", p.display()));
             e.extend(&mut s.lines().map(|ss| ss.to_owned()));
             true
         }
-        Ok(None) => fail!("impossible?"),
         Err(e) => {
-            write!(&mut io::stderr() as &mut Writer,
-                   "Error reading {}: {}", p.display(), e.to_str());
+            (write!(&mut io::stderr() as &mut Writer,
+                    "Error reading {}: {}", p.display(), e.to_str())).unwrap();
             os::set_exit_status(10);
             false
         }
@@ -131,7 +129,7 @@ fn get_ast(path: Path) -> (@codemap::CodeMap, ast::Crate) {
     use syntax::diagnostic;
 
     // cargo culted from rustdoc_ng :(
-    let parsesess = syntax::parse::new_parse_sess(None);
+    let parsesess = syntax::parse::new_parse_sess();
     let input = driver::FileInput(path);
 
     let sessopts = @session::Options {
@@ -140,18 +138,17 @@ fn get_ast(path: Path) -> (@codemap::CodeMap, ast::Crate) {
     };
 
 
-    let diagnostic_handler = diagnostic::mk_handler(None);
+    let diagnostic_handler = diagnostic::mk_handler();
     let span_diagnostic_handler =
         diagnostic::mk_span_handler(diagnostic_handler, parsesess.cm);
 
     let sess = driver::build_session_(sessopts, None, parsesess.cm,
-                                      @diagnostic::DefaultEmitter as @diagnostic::Emitter,
                                       span_diagnostic_handler);
 
     let cfg = driver::build_configuration(sess);
 
-    let crate = driver::phase_1_parse_input(sess, cfg.clone(), &input);
+    let crate = driver::phase_1_parse_input(sess, cfg, &input);
     let loader = &mut rustc::metadata::creader::Loader::new(sess);
     (parsesess.cm,
-     driver::phase_2_configure_and_expand(sess, cfg, loader, crate).n0())
+     driver::phase_2_configure_and_expand(sess, loader, crate).n0())
 }
