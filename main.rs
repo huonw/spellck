@@ -5,19 +5,19 @@
 //! Prints the misspelled words in the public documentation &
 //! identifiers of a crate.
 
-extern mod collections;
-extern mod getopts;
-extern mod syntax;
-extern mod rustc;
+extern crate collections;
+extern crate getopts;
+extern crate syntax;
+extern crate rustc;
 use std::{io, os, str};
-use std::hashmap::HashSet;
-use collections::priority_queue;
+use collections::{HashSet, PriorityQueue};
 use syntax::{ast, codemap};
 
 pub mod words;
 mod visitor;
 
 static DEFAULT_DICT: &'static str = "/usr/share/dict/words";
+static LIBDIR: &'static str = "/usr/local/lib/rustlib/x86_64-unknown-linux-gnu/lib";
 
 fn main() {
     let args = std::os::args();
@@ -50,10 +50,10 @@ fn main() {
     let mut any_mistakes = false;
 
     for name in matches.free.iter() {
-        let (cm, crate) = get_ast(Path::new(name.as_slice()));
+        let (cm, krate) = get_ast(Path::new(name.as_slice()));
 
         let mut visitor = visitor::SpellingVisitor::new(&words);
-        visitor.check_crate(&crate);
+        visitor.check_crate(&krate);
 
         struct Sort<'a> {
             sp: codemap::Span,
@@ -68,7 +68,7 @@ fn main() {
 
         // extract the lines in order of the spans, so that e.g. files
         // are grouped together, and lines occur in increasing order.
-        let pq: priority_queue::PriorityQueue<Sort> =
+        let pq: PriorityQueue<Sort> =
             visitor.misspellings.iter().map(|(k, v)| Sort { sp: *k, words: v }).collect();
 
         // run through the spans, printing the words that are
@@ -88,7 +88,7 @@ fn main() {
                      len=words.len());
 
             // first line; no lines = no printing
-            match lines.lines {
+            match lines.lines.as_slice() {
                 [line_num, ..] => {
                     let line = lines.file.get_line(line_num as int);
                     println!("{}: {}", sp_text, line);
@@ -133,10 +133,10 @@ fn get_ast(path: Path) -> (@codemap::CodeMap, ast::Crate) {
     let input = driver::FileInput(path);
 
     let sessopts = @session::Options {
-        binary: ~"spellck",
+        maybe_sysroot: Some(@os::self_exe_path().unwrap().dir_path()),
+        addl_lib_search_paths: @std::cell::RefCell::new((~[Path::new(LIBDIR)]).move_iter().collect()),
         .. (*session::basic_options()).clone()
     };
-
 
     let diagnostic_handler = diagnostic::mk_handler();
     let span_diagnostic_handler =
@@ -147,8 +147,8 @@ fn get_ast(path: Path) -> (@codemap::CodeMap, ast::Crate) {
 
     let cfg = driver::build_configuration(sess);
 
-    let crate = driver::phase_1_parse_input(sess, cfg, &input);
+    let krate = driver::phase_1_parse_input(sess, cfg, &input);
     let loader = &mut rustc::metadata::creader::Loader::new(sess);
     (parsesess.cm,
-     driver::phase_2_configure_and_expand(sess, loader, crate).n0())
+     driver::phase_2_configure_and_expand(sess, loader, krate).val0())
 }

@@ -1,4 +1,4 @@
-use std::hashmap;
+use collections::hashmap;
 use std::ascii::StrAsciiExt;
 
 use syntax::{ast, visit};
@@ -67,7 +67,7 @@ impl<'a> SpellingVisitor<'a> {
 
         // spooky action at a distance; extracts the string
         // representation from TLS.
-        let word_ = token::get_ident(id.name);
+        let word_ = token::get_ident(id);
         let word = word_.get();
         // secret rust internals, e.g. __std_macros
         if word.starts_with("__") { return }
@@ -94,10 +94,10 @@ impl<'a> SpellingVisitor<'a> {
         }
     }
 
-    /// Spell-check a whole crate.
-    pub fn check_crate(&mut self, crate: &ast::Crate) {
-        self.check_doc_attrs(crate.attrs);
-        visit::walk_crate(self, crate, ())
+    /// Spell-check a whole krate.
+    pub fn check_crate(&mut self, krate: &ast::Crate) {
+        self.check_doc_attrs(krate.attrs);
+        visit::walk_crate(self, krate, ())
     }
 }
 
