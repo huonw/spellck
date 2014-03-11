@@ -96,7 +96,7 @@ impl<'a> SpellingVisitor<'a> {
 
     /// Spell-check a whole krate.
     pub fn check_crate(&mut self, krate: &ast::Crate) {
-        self.check_doc_attrs(krate.attrs);
+        self.check_doc_attrs(krate.attrs.as_slice());
         visit::walk_crate(self, krate, ())
     }
 }
@@ -116,7 +116,7 @@ impl<'a> Visitor<()> for SpellingVisitor<'a> {
         // only check the ident for `use self = foo;`; since there's
         // nothing else the user can do to control the name.
         if view_item.vis == ast::Public {
-            self.check_doc_attrs(view_item.attrs);
+            self.check_doc_attrs(view_item.attrs.as_slice());
             match view_item.node {
                 ast::ViewItemUse(ref vps) => {
                     for &vp in vps.iter() {
@@ -128,7 +128,7 @@ impl<'a> Visitor<()> for SpellingVisitor<'a> {
                         }
                     }
                 }
-                ast::ViewItemExternMod(..) => {}
+                ast::ViewItemExternCrate(..) => {}
             }
         }
     }
@@ -138,7 +138,7 @@ impl<'a> Visitor<()> for SpellingVisitor<'a> {
         if foreign_item.vis != ast::Private {
             // (the visibility rules seems to be strange here, pub is
             // just ignored)
-            self.check_doc_attrs(foreign_item.attrs);
+            self.check_doc_attrs(foreign_item.attrs.as_slice());
         }
     }
     fn visit_item(&mut self, item: &ast::Item, env: ()) {
@@ -155,7 +155,7 @@ impl<'a> Visitor<()> for SpellingVisitor<'a> {
             self.check_ident(item.ident, item.span);
         }
         if should_check_doc {
-            self.check_doc_attrs(item.attrs);
+            self.check_doc_attrs(item.attrs.as_slice());
         }
 
         match item.node {
@@ -169,7 +169,7 @@ impl<'a> Visitor<()> for SpellingVisitor<'a> {
 
                     if !no_check {
                         self.check_ident(var.node.name, var.span);
-                        self.check_doc_attrs(var.node.attrs);
+                        self.check_doc_attrs(var.node.attrs.as_slice());
                     }
                 }
             }
@@ -181,7 +181,7 @@ impl<'a> Visitor<()> for SpellingVisitor<'a> {
                 for &method in methods.iter() {
                     if method.vis == ast::Public {
                         self.check_ident(method.ident, method.span);
-                        self.check_doc_attrs(method.attrs);
+                        self.check_doc_attrs(method.attrs.as_slice());
                     }
                 }
             }
@@ -201,7 +201,7 @@ impl<'a> Visitor<()> for SpellingVisitor<'a> {
     }
 
     fn visit_ty_method(&mut self, method_type: &ast::TypeMethod, env: ()) {
-        self.check_doc_attrs(method_type.attrs);
+        self.check_doc_attrs(method_type.attrs.as_slice());
         self.check_ident(method_type.ident, method_type.span);
         visit::walk_ty_method(self, method_type, env)
     }
@@ -211,7 +211,7 @@ impl<'a> Visitor<()> for SpellingVisitor<'a> {
                 visit::walk_trait_method(self, trait_method, env)
             }
             ast::Provided(method) => {
-                self.check_doc_attrs(method.attrs);
+                self.check_doc_attrs(method.attrs.as_slice());
                 self.check_ident(method.ident, method.span);
             }
         }
@@ -236,7 +236,7 @@ impl<'a> Visitor<()> for SpellingVisitor<'a> {
                 match vis {
                     ast::Public | ast::Inherited => {
                         self.check_ident(id, struct_field.span);
-                        self.check_doc_attrs(struct_field.node.attrs);
+                        self.check_doc_attrs(struct_field.node.attrs.as_slice());
                     }
                     ast::Private => {}
                 }

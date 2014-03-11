@@ -59,6 +59,11 @@ fn main() {
             sp: codemap::Span,
             words: &'a HashSet<~str>
         }
+        impl<'a> Eq for Sort<'a> {
+            fn eq(&self, other: &Sort<'a>) -> bool {
+                self.sp == other.sp
+            }
+        }
         impl<'a> Ord for Sort<'a> {
             fn lt(&self, other: &Sort<'a>) -> bool {
                 self.sp.lo < other.sp.lo ||
@@ -138,7 +143,7 @@ fn get_ast(path: Path) -> (@codemap::CodeMap, ast::Crate) {
         .. (*session::basic_options()).clone()
     };
 
-    let diagnostic_handler = diagnostic::mk_handler();
+    let diagnostic_handler = diagnostic::default_handler();
     let span_diagnostic_handler =
         diagnostic::mk_span_handler(diagnostic_handler, parsesess.cm);
 
