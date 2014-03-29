@@ -56,6 +56,6 @@ impl<'a> Iterator<&'a str> for SubwordIter<'a> {
 fn test_words() {
     let s = "Foo_barBazÄåöAB123C";
 
-    assert_eq!(subwords(s).to_owned_vec(),
-               ~["Foo", "bar", "Baz", "Äåö", "A", "B", "C"]);
+    assert_eq!(subwords(s).collect::<Vec<_>>(),
+               vec!("Foo", "bar", "Baz", "Äåö", "A", "B", "C"));
 }

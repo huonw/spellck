@@ -48,14 +48,9 @@ impl<'a> SpellingVisitor<'a> {
     fn check_subwords(&mut self, w: &str, sp: Span) {
         for w in words::subwords(w) {
             if !self.raw_word_is_correct(w) {
-                let insert = |_: &Span, _: ()| {
-                    let mut set = hashmap::HashSet::new();
-                    set.insert(w.to_owned());
-                    set
-                };
-                self.misspellings.mangle(sp, (),
-                                         insert,
-                                         |_, set, _| { set.insert(w.to_owned()); });
+                let set =
+                    self.misspellings.find_or_insert_with(sp, |_| hashmap::HashSet::new());
+                set.insert(w.to_owned());
             }
         }
     }
@@ -241,7 +236,7 @@ impl<'a> Visitor<()> for SpellingVisitor<'a> {
                     ast::Private => {}
                 }
             }
-            ast::UnnamedField => {}
+            ast::UnnamedField(_) => {}
         }
 
         // no need to recur; nothing below this level to check.

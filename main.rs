@@ -12,6 +12,7 @@ extern crate rustc;
 use std::{io, os, str};
 use collections::{HashSet, PriorityQueue};
 use syntax::{ast, codemap};
+use rustc::driver::{driver, session};
 
 pub mod words;
 mod visitor;
@@ -50,7 +51,8 @@ fn main() {
     let mut any_mistakes = false;
 
     for name in matches.free.iter() {
-        let (cm, krate) = get_ast(Path::new(name.as_slice()));
+        let (sess, krate) = get_ast(Path::new(name.as_slice()));
+        let cm = sess.codemap();
 
         let mut visitor = visitor::SpellingVisitor::new(&words);
         visitor.check_crate(&krate);
@@ -85,7 +87,7 @@ fn main() {
             let sp_text = cm.span_to_str(sp);
 
             // [] required for connect :(
-            let word_vec = words.iter().map(|s| s.as_slice()).to_owned_vec();
+            let word_vec: Vec<&str> = words.iter().map(|s| s.as_slice()).collect();
 
             println!("{}: misspelled {len, plural, =1{word} other{words}}: {}",
                      sp_text,
@@ -115,7 +117,7 @@ fn read_lines_into<E: Extendable<~str>>
         Ok(mut r) => {
             let s = str::from_utf8_owned(r.read_to_end().unwrap())
                 .expect(format!("{} is not UTF-8", p.display()));
-            e.extend(&mut s.lines().map(|ss| ss.to_owned()));
+            e.extend(s.lines().map(|ss| ss.to_owned()));
             true
         }
         Err(e) => {
@@ -129,31 +131,32 @@ fn read_lines_into<E: Extendable<~str>>
 
 /// Extract the expanded ast of a crate, along with the codemap which
 /// connects source code locations to the actual code.
-fn get_ast(path: Path) -> (@codemap::CodeMap, ast::Crate) {
-    use rustc::driver::{driver, session};
+fn get_ast(path: Path) -> (session::Session, ast::Crate) {
     use syntax::diagnostic;
 
     // cargo culted from rustdoc_ng :(
-    let parsesess = syntax::parse::new_parse_sess();
     let input = driver::FileInput(path);
 
-    let sessopts = @session::Options {
-        maybe_sysroot: Some(@os::self_exe_path().unwrap().dir_path()),
-        addl_lib_search_paths: @std::cell::RefCell::new((~[Path::new(LIBDIR)]).move_iter().collect()),
-        .. (*session::basic_options()).clone()
+    let sessopts = session::Options {
+        maybe_sysroot: Some(os::self_exe_path().unwrap().dir_path()),
+        addl_lib_search_paths: std::cell::RefCell::new((~[Path::new(LIBDIR)]).move_iter().collect()),
+        .. (session::basic_options()).clone()
     };
 
+    let codemap = syntax::codemap::CodeMap::new();
     let diagnostic_handler = diagnostic::default_handler();
     let span_diagnostic_handler =
-        diagnostic::mk_span_handler(diagnostic_handler, parsesess.cm);
+        diagnostic::mk_span_handler(diagnostic_handler, codemap);
 
-    let sess = driver::build_session_(sessopts, None, parsesess.cm,
-                                      span_diagnostic_handler);
+    let sess = driver::build_session_(sessopts, None, span_diagnostic_handler);
 
-    let cfg = driver::build_configuration(sess);
+    let cfg = driver::build_configuration(&sess);
 
-    let krate = driver::phase_1_parse_input(sess, cfg, &input);
-    let loader = &mut rustc::metadata::creader::Loader::new(sess);
-    (parsesess.cm,
-     driver::phase_2_configure_and_expand(sess, loader, krate).val0())
+    let krate = driver::phase_1_parse_input(&sess, cfg, &input);
+    let krate = {
+        let mut loader = rustc::metadata::creader::Loader::new(&sess);
+        driver::phase_2_configure_and_expand(&sess, &mut loader, krate,
+                                             &from_str("spellck").unwrap()).val0()
+    };
+    (sess, krate)
 }
