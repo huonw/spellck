@@ -1,6 +1,6 @@
-#[crate_id="spellck"];
-#[deny(missing_doc)];
-#[feature(managed_boxes)];
+#![crate_id="spellck"]
+#![deny(missing_doc)]
+#![feature(managed_boxes)]
 
 //! Prints the misspelled words in the public documentation &
 //! identifiers of a crate.

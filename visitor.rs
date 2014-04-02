@@ -15,7 +15,7 @@ pub struct SpellingVisitor<'a> {
     /// The reference dictionary.
     words: &'a hashmap::HashSet<~str>,
     /// The misspelled words, indexed by the span on which they occur.
-    misspellings: hashmap::HashMap<Span, hashmap::HashSet<~str>>,
+    pub misspellings: hashmap::HashMap<Span, hashmap::HashSet<~str>>,
 
     /// Whether the traversal should only check documentation, not
     /// idents; gets controlled internally, e.g. for `extern` blocks.

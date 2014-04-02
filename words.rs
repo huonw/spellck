@@ -4,9 +4,9 @@ use std::str;
 
 /// Struct for the `subwords` iterator.
 pub struct SubwordIter<'a> {
-    priv s: &'a str,
-    priv iter: str::CharOffsets<'a>,
-    priv word_start: uint,
+    s: &'a str,
+    iter: str::CharOffsets<'a>,
+    word_start: uint,
 }
 
 /// Iterate over the "subwords" of a string, e.g. `FooBar` -> `Foo`,
