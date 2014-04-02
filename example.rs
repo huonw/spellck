@@ -21,7 +21,7 @@ static noqwertyuiop: uint = 1;
 /// yesblahblahblah
 pub enum yesasdfghjkl {
     /// noblahblahblah
-    priv Noasdf,
+    Noasdf,
     /// yesblahblahblah
     Yesasdf
 }
@@ -37,7 +37,7 @@ enum nolkjhg {
 /// yesblahblahblah
 pub struct yesgfhgsd {
     /// noblahblahblah
-    priv nogjfhdhg: uint,
+    nogjfhdhg: uint,
     /// yesblahblahblah
     pub yesggfk: uint
 }
@@ -54,7 +54,7 @@ impl yesgfhgsd { // shouldn't actually appear.
 /// noblahblahblah
 struct nogfhgsd {
     /// noblahblahblah
-    priv nogjfhdhg: uint,
+    nogjfhdhg: uint,
     /// yesblahblahblah
     pub yesggfk: uint
 }
