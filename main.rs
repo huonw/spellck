@@ -9,7 +9,8 @@ extern crate collections;
 extern crate getopts;
 extern crate syntax;
 extern crate rustc;
-use std::{io, os, str};
+use std::{io, os};
+use std::strbuf::StrBuf;
 use collections::{HashSet, PriorityQueue};
 use syntax::{ast, codemap};
 use rustc::driver::{driver, session};
@@ -115,9 +116,9 @@ fn read_lines_into<E: Extendable<~str>>
                   (p: &Path, e: &mut E) -> bool {
     match io::File::open(p) {
         Ok(mut r) => {
-            let s = str::from_utf8_owned(r.read_to_end().unwrap())
+            let s = StrBuf::from_utf8(r.read_to_end().unwrap())
                 .expect(format!("{} is not UTF-8", p.display()));
-            e.extend(s.lines().map(|ss| ss.to_owned()));
+            e.extend(s.as_slice().lines().map(|ss| ss.to_owned()));
             true
         }
         Err(e) => {
