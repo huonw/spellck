@@ -29,14 +29,14 @@ fn main() {
                  getopts::optflag("h", "help", "show this help message")];
 
     let matches = getopts::getopts(args.tail(), opts).unwrap();
-    if matches.opts_present([~"h", ~"help"]) {
+    if matches.opts_present(["h".to_owned(), "help".to_owned()]) {
         println!("{}", getopts::usage(args[0], opts));
         return;
     }
 
     let mut words = HashSet::new();
 
-    if !matches.opts_present([~"n", ~"no-def-dict"]) {
+    if !matches.opts_present(["n".to_owned(), "no-def-dict".to_owned()]) {
         if !read_lines_into(&Path::new(DEFAULT_DICT), &mut words) {
             return
         }

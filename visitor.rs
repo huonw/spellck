@@ -113,14 +113,12 @@ impl<'a> Visitor<()> for SpellingVisitor<'a> {
         if view_item.vis == ast::Public {
             self.check_doc_attrs(view_item.attrs.as_slice());
             match view_item.node {
-                ast::ViewItemUse(ref vps) => {
-                    for &vp in vps.iter() {
-                        match vp.node {
-                            ast::ViewPathSimple(id, _, _) => {
-                                self.check_ident(id, vp.span);
-                            }
-                            _ => {}
+                ast::ViewItemUse(ref vp) => {
+                    match vp.node {
+                        ast::ViewPathSimple(id, _, _) => {
+                            self.check_ident(id, vp.span);
                         }
+                        _ => {}
                     }
                 }
                 ast::ViewItemExternCrate(..) => {}
@@ -130,17 +128,16 @@ impl<'a> Visitor<()> for SpellingVisitor<'a> {
     fn visit_foreign_item(&mut self, foreign_item: &ast::ForeignItem, _env: ()) {
         // don't check the ident; there's nothing the user can do to
         // control the name.
-        if foreign_item.vis != ast::Private {
+        if foreign_item.vis == ast::Public {
             // (the visibility rules seems to be strange here, pub is
             // just ignored)
             self.check_doc_attrs(foreign_item.attrs.as_slice());
         }
     }
     fn visit_item(&mut self, item: &ast::Item, env: ()) {
-        // no need to check the names/docs of ast::Private things
+        // no need to check the names/docs of non-Public things
         // (although there may be ast::Public things inside them that
-        // are re-exported somewhere else, so still recur). (Also,
-        // all(?) items inherit ast::Private visibility.)
+        // are re-exported somewhere else, so still recur).
         let should_check_doc = item.vis == ast::Public || match item.node {
             ast::ItemImpl(..) => true,
             _ => false
@@ -158,11 +155,8 @@ impl<'a> Visitor<()> for SpellingVisitor<'a> {
             // hand. This is probably (subtly or otherwise) incorrect
             // wrt to visibility.
             ast::ItemEnum(ref ed, _) => {
-                for var in ed.variants.iter() {
-                    let no_check = var.node.vis == ast::Private ||
-                        (var.node.vis == ast::Inherited && item.vis != ast::Public);
-
-                    if !no_check {
+                if item.vis == ast::Public {
+                    for var in ed.variants.iter() {
                         self.check_ident(var.node.name, var.span);
                         self.check_doc_attrs(var.node.attrs.as_slice());
                     }
@@ -229,11 +223,11 @@ impl<'a> Visitor<()> for SpellingVisitor<'a> {
         match struct_field.node.kind {
             ast::NamedField(id, vis) => {
                 match vis {
-                    ast::Public | ast::Inherited => {
+                    ast::Public => {
                         self.check_ident(id, struct_field.span);
                         self.check_doc_attrs(struct_field.node.attrs.as_slice());
                     }
-                    ast::Private => {}
+                    ast::Inherited => {}
                 }
             }
             ast::UnnamedField(_) => {}
