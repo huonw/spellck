@@ -6,17 +6,17 @@ use std::str;
 pub struct SubwordIter<'a> {
     s: &'a str,
     iter: str::CharOffsets<'a>,
-    word_start: uint,
+    word_start: Option<uint>,
 }
 
-/// Iterate over the "subwords" of a string, e.g. `FooBar` -> `Foo`,
+/// Iterate over the "subwords" of a string, e.g. `Foobar` -> `Foo`,
 /// `Bar`; `foo_bar` -> `foo`, `bar`; `AB Cd123e` -> `A`, `B`, `Cd`,
 /// `e`.
 pub fn subwords<'a>(s: &'a str) -> SubwordIter<'a> {
     SubwordIter {
         s: s,
         iter: s.char_indices(),
-        word_start: -1u
+        word_start: None
     }
 }
 
@@ -26,29 +26,23 @@ impl<'a> Iterator<&'a str> for SubwordIter<'a> {
         for (offset, c) in self.iter {
             // skip leading non-alphabetic characters
             let alpha = c.is_alphabetic();
-            if word_start == -1 {
-                if alpha {
-                    word_start = offset
-                }
-            } else {
-                if !alpha || c.is_uppercase() {
+            match word_start {
+                None if alpha => word_start = Some(offset),
+                None => {}
+                Some(ws) if !alpha || c.is_uppercase() => {
                     self.word_start = if alpha {
                         // need to reuse this character for the next word
-                        offset
+                        Some(offset)
                     } else {
-                        -1
+                        None
                     };
 
-                    return Some(self.s.slice(word_start, offset))
+                    return Some(self.s.slice(ws, offset))
                 }
+                Some(_) => {}
             }
         }
-        if word_start == -1 {
-            None
-        } else {
-            self.word_start = -1;
-            Some(self.s.slice_from(word_start))
-        }
+        word_start.map(|ws| { self.word_start = None; self.s.slice_from(ws) })
     }
 }
 
