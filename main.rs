@@ -13,7 +13,7 @@ use std::{io, os};
 use std::strbuf::StrBuf;
 use collections::{HashSet, PriorityQueue};
 use syntax::{ast, codemap};
-use rustc::driver::{driver, session};
+use rustc::driver::{driver, session, config};
 
 pub mod words;
 mod visitor;
@@ -30,7 +30,7 @@ fn main() {
 
     let matches = getopts::getopts(args.tail(), opts).unwrap();
     if matches.opts_present(["h".to_owned(), "help".to_owned()]) {
-        println!("{}", getopts::usage(args[0], opts));
+        println!("{}", getopts::usage(args.get(0).as_slice(), opts));
         return;
     }
 
@@ -138,10 +138,10 @@ fn get_ast(path: Path) -> (session::Session, ast::Crate) {
     // cargo culted from rustdoc_ng :(
     let input = driver::FileInput(path);
 
-    let sessopts = session::Options {
+    let sessopts = config::Options {
         maybe_sysroot: Some(os::self_exe_path().unwrap().dir_path()),
         addl_lib_search_paths: std::cell::RefCell::new((~[Path::new(LIBDIR)]).move_iter().collect()),
-        .. (session::basic_options()).clone()
+        .. (config::basic_options()).clone()
     };
 
     let codemap = syntax::codemap::CodeMap::new();
@@ -149,9 +149,9 @@ fn get_ast(path: Path) -> (session::Session, ast::Crate) {
     let span_diagnostic_handler =
         diagnostic::mk_span_handler(diagnostic_handler, codemap);
 
-    let sess = driver::build_session_(sessopts, None, span_diagnostic_handler);
+    let sess = session::build_session_(sessopts, None, span_diagnostic_handler);
 
-    let cfg = driver::build_configuration(&sess);
+    let cfg = config::build_configuration(&sess);
 
     let krate = driver::phase_1_parse_input(&sess, cfg, &input);
     let krate = {
