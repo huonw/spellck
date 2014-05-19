@@ -22,21 +22,21 @@ static DEFAULT_DICT: &'static str = "/usr/share/dict/words";
 static LIBDIR: &'static str = "/usr/local/lib/rustlib/x86_64-unknown-linux-gnu/lib";
 
 fn main() {
-    let args = std::os::args();
-    let opts = ~[getopts::optmulti("d", "dict",
+    let args: Vec<_> = std::os::args().move_iter().map(|s| s.to_strbuf()).collect();
+    let opts = [getopts::optmulti("d", "dict",
                                   "dictionary file (a list of words, one per line)", "PATH"),
-                 getopts::optflag("n", "no-def-dict", "don't use the default dictionary"),
-                 getopts::optflag("h", "help", "show this help message")];
+                getopts::optflag("n", "no-def-dict", "don't use the default dictionary"),
+                getopts::optflag("h", "help", "show this help message")];
 
     let matches = getopts::getopts(args.tail(), opts).unwrap();
-    if matches.opts_present(["h".to_owned(), "help".to_owned()]) {
+    if matches.opt_present("hhelp") {
         println!("{}", getopts::usage(args.get(0).as_slice(), opts));
         return;
     }
 
     let mut words = HashSet::new();
 
-    if !matches.opts_present(["n".to_owned(), "no-def-dict".to_owned()]) {
+    if !matches.opt_present("no-def-dict") {
         if !read_lines_into(&Path::new(DEFAULT_DICT), &mut words) {
             return
         }
@@ -117,7 +117,7 @@ fn read_lines_into<E: Extendable<~str>>
     match io::File::open(p) {
         Ok(mut r) => {
             let s = StrBuf::from_utf8(r.read_to_end().unwrap())
-                .expect(format!("{} is not UTF-8", p.display()));
+                .ok().expect(format!("{} is not UTF-8", p.display()));
             e.extend(s.as_slice().lines().map(|ss| ss.to_owned()));
             true
         }
@@ -145,7 +145,7 @@ fn get_ast(path: Path) -> (session::Session, ast::Crate) {
     };
 
     let codemap = syntax::codemap::CodeMap::new();
-    let diagnostic_handler = diagnostic::default_handler();
+    let diagnostic_handler = diagnostic::default_handler(diagnostic::Auto);
     let span_diagnostic_handler =
         diagnostic::mk_span_handler(diagnostic_handler, codemap);
 

@@ -208,15 +208,12 @@ impl<'a> Visitor<()> for SpellingVisitor<'a> {
 
     fn visit_struct_def(&mut self,
                         struct_definition: &ast::StructDef,
-                        identifier: ast::Ident,
-                        generics: &ast::Generics,
-                        node_id: ast::NodeId,
+                        _identifier: ast::Ident,
+                        _generics: &ast::Generics,
+                        _node_id: ast::NodeId,
                         env: ()) {
         visit::walk_struct_def(self,
                                struct_definition,
-                               identifier,
-                               generics,
-                               node_id,
                                env)
     }
     fn visit_struct_field(&mut self, struct_field: &ast::StructField, _env: ()) {
