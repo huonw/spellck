@@ -9,10 +9,11 @@ extern crate collections;
 extern crate getopts;
 extern crate syntax;
 extern crate rustc;
-use std::{io, os};
+use std::{io, os, cmp};
 use std::strbuf::StrBuf;
 use collections::{HashSet, PriorityQueue};
-use syntax::{ast, codemap};
+use syntax::ast;
+use syntax::codemap::{Span, BytePos, CodeMap};
 use rustc::driver::{driver, session, config};
 
 pub mod words;
@@ -29,7 +30,7 @@ fn main() {
                 getopts::optflag("h", "help", "show this help message")];
 
     let matches = getopts::getopts(args.tail(), opts).unwrap();
-    if matches.opt_present("hhelp") {
+    if matches.opt_present("help") {
         println!("{}", getopts::usage(args.get(0).as_slice(), opts));
         return;
     }
@@ -59,7 +60,7 @@ fn main() {
         visitor.check_crate(&krate);
 
         struct Sort<'a> {
-            sp: codemap::Span,
+            sp: Span,
             words: &'a HashSet<~str>
         }
         impl<'a> Eq for Sort<'a> {
@@ -73,6 +74,14 @@ fn main() {
                     (self.sp.lo == other.sp.lo && self.sp.hi < other.sp.hi)
             }
         }
+        impl<'a> TotalEq for Sort<'a> {}
+        impl<'a> TotalOrd for Sort<'a> {
+            fn cmp(&self, other: &Sort<'a>) -> Ordering {
+                let Span { lo: BytePos(slo), hi: BytePos(shi), .. } = self.sp;
+                let Span { lo: BytePos(olo), hi: BytePos(ohi), .. } = other.sp;
+                cmp::lexical_ordering(slo.cmp(&olo), shi.cmp(&ohi))
+            }
+        }
 
         // extract the lines in order of the spans, so that e.g. files
         // are grouped together, and lines occur in increasing order.
@@ -81,7 +90,7 @@ fn main() {
 
         // run through the spans, printing the words that are
         // apparently misspelled
-        for Sort {sp, words} in pq.to_sorted_vec().move_iter() {
+        for Sort {sp, words} in pq.into_sorted_vec().move_iter() {
             any_mistakes = true;
 
             let lines = cm.span_to_lines(sp);
@@ -144,7 +153,7 @@ fn get_ast(path: Path) -> (session::Session, ast::Crate) {
         .. (config::basic_options()).clone()
     };
 
-    let codemap = syntax::codemap::CodeMap::new();
+    let codemap = CodeMap::new();
     let diagnostic_handler = diagnostic::default_handler(diagnostic::Auto);
     let span_diagnostic_handler =
         diagnostic::mk_span_handler(diagnostic_handler, codemap);
