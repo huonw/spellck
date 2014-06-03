@@ -10,7 +10,6 @@ extern crate getopts;
 extern crate syntax;
 extern crate rustc;
 use std::{io, os, cmp};
-use std::strbuf::StrBuf;
 use collections::{HashSet, PriorityQueue};
 use syntax::ast;
 use syntax::codemap::{Span, BytePos, CodeMap};
@@ -23,7 +22,7 @@ static DEFAULT_DICT: &'static str = "/usr/share/dict/words";
 static LIBDIR: &'static str = "/usr/local/lib/rustlib/x86_64-unknown-linux-gnu/lib";
 
 fn main() {
-    let args: Vec<_> = std::os::args().move_iter().map(|s| s.to_strbuf()).collect();
+    let args = os::args();
     let opts = [getopts::optmulti("d", "dict",
                                   "dictionary file (a list of words, one per line)", "PATH"),
                 getopts::optflag("n", "no-def-dict", "don't use the default dictionary"),
@@ -61,7 +60,7 @@ fn main() {
 
         struct Sort<'a> {
             sp: Span,
-            words: &'a HashSet<~str>
+            words: &'a HashSet<String>
         }
         impl<'a> Eq for Sort<'a> {
             fn eq(&self, other: &Sort<'a>) -> bool {
@@ -121,18 +120,18 @@ fn main() {
 }
 
 /// Load each line of the file `p` into the given `Extendable` object.
-fn read_lines_into<E: Extendable<~str>>
+fn read_lines_into<E: Extendable<String>>
                   (p: &Path, e: &mut E) -> bool {
     match io::File::open(p) {
         Ok(mut r) => {
-            let s = StrBuf::from_utf8(r.read_to_end().unwrap())
+            let s = String::from_utf8(r.read_to_end().unwrap())
                 .ok().expect(format!("{} is not UTF-8", p.display()));
-            e.extend(s.as_slice().lines().map(|ss| ss.to_owned()));
+            e.extend(s.as_slice().lines().map(|ss| ss.to_string()));
             true
         }
         Err(e) => {
             (write!(&mut io::stderr() as &mut Writer,
-                    "Error reading {}: {}", p.display(), e.to_str())).unwrap();
+                    "Error reading {}: {}", p.display(), e)).unwrap();
             os::set_exit_status(10);
             false
         }
@@ -149,7 +148,8 @@ fn get_ast(path: Path) -> (session::Session, ast::Crate) {
 
     let sessopts = config::Options {
         maybe_sysroot: Some(os::self_exe_path().unwrap().dir_path()),
-        addl_lib_search_paths: std::cell::RefCell::new((~[Path::new(LIBDIR)]).move_iter().collect()),
+        addl_lib_search_paths: std::cell::RefCell::new(
+            (vec![Path::new(LIBDIR)]).move_iter().collect()),
         .. (config::basic_options()).clone()
     };
 

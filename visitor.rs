@@ -13,9 +13,9 @@ use words;
 /// through a traversal of the whole ast.
 pub struct SpellingVisitor<'a> {
     /// The reference dictionary.
-    words: &'a hashmap::HashSet<~str>,
+    words: &'a hashmap::HashSet<String>,
     /// The misspelled words, indexed by the span on which they occur.
-    pub misspellings: hashmap::HashMap<Span, hashmap::HashSet<~str>>,
+    pub misspellings: hashmap::HashMap<Span, hashmap::HashSet<String>>,
 
     /// Whether the traversal should only check documentation, not
     /// idents; gets controlled internally, e.g. for `extern` blocks.
@@ -24,7 +24,7 @@ pub struct SpellingVisitor<'a> {
 
 impl<'a> SpellingVisitor<'a> {
     /// ast::Create a new Spelling Visitor.
-    pub fn new<'a>(words: &'a hashmap::HashSet<~str>) -> SpellingVisitor<'a> {
+    pub fn new<'a>(words: &'a hashmap::HashSet<String>) -> SpellingVisitor<'a> {
         SpellingVisitor {
             words: words,
             misspellings: hashmap::HashMap::new(),
@@ -50,7 +50,7 @@ impl<'a> SpellingVisitor<'a> {
             if !self.raw_word_is_correct(w) {
                 let set =
                     self.misspellings.find_or_insert_with(sp, |_| hashmap::HashSet::new());
-                set.insert(w.to_owned());
+                set.insert(w.to_string());
             }
         }
     }
