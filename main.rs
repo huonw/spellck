@@ -5,12 +5,11 @@
 //! Prints the misspelled words in the public documentation &
 //! identifiers of a crate.
 
-extern crate collections;
 extern crate getopts;
 extern crate syntax;
 extern crate rustc;
 use std::{io, os, cmp};
-use collections::{HashSet, PriorityQueue};
+use std::collections::{HashSet, PriorityQueue};
 use syntax::ast;
 use syntax::codemap::{Span, BytePos, CodeMap};
 use rustc::driver::{driver, session, config};
@@ -62,19 +61,19 @@ fn main() {
             sp: Span,
             words: &'a HashSet<String>
         }
-        impl<'a> Eq for Sort<'a> {
+        impl<'a> PartialEq for Sort<'a> {
             fn eq(&self, other: &Sort<'a>) -> bool {
                 self.sp == other.sp
             }
         }
-        impl<'a> Ord for Sort<'a> {
+        impl<'a> PartialOrd for Sort<'a> {
             fn lt(&self, other: &Sort<'a>) -> bool {
                 self.sp.lo < other.sp.lo ||
                     (self.sp.lo == other.sp.lo && self.sp.hi < other.sp.hi)
             }
         }
-        impl<'a> TotalEq for Sort<'a> {}
-        impl<'a> TotalOrd for Sort<'a> {
+        impl<'a> Eq for Sort<'a> {}
+        impl<'a> Ord for Sort<'a> {
             fn cmp(&self, other: &Sort<'a>) -> Ordering {
                 let Span { lo: BytePos(slo), hi: BytePos(shi), .. } = self.sp;
                 let Span { lo: BytePos(olo), hi: BytePos(ohi), .. } = other.sp;
@@ -98,10 +97,10 @@ fn main() {
             // [] required for connect :(
             let word_vec: Vec<&str> = words.iter().map(|s| s.as_slice()).collect();
 
-            println!("{}: misspelled {len, plural, =1{word} other{words}}: {}",
+            println!("{}: misspelled {words}: {}",
                      sp_text,
                      word_vec.connect(", "),
-                     len=words.len());
+                     words = if words.len() == 1 {"word"} else {"words"});
 
             // first line; no lines = no printing
             match lines.lines.as_slice() {
@@ -125,7 +124,7 @@ fn read_lines_into<E: Extendable<String>>
     match io::File::open(p) {
         Ok(mut r) => {
             let s = String::from_utf8(r.read_to_end().unwrap())
-                .ok().expect(format!("{} is not UTF-8", p.display()));
+                .ok().expect(format!("{} is not UTF-8", p.display()).as_slice());
             e.extend(s.as_slice().lines().map(|ss| ss.to_string()));
             true
         }
@@ -163,10 +162,7 @@ fn get_ast(path: Path) -> (session::Session, ast::Crate) {
     let cfg = config::build_configuration(&sess);
 
     let krate = driver::phase_1_parse_input(&sess, cfg, &input);
-    let krate = {
-        let mut loader = rustc::metadata::creader::Loader::new(&sess);
-        driver::phase_2_configure_and_expand(&sess, &mut loader, krate,
-                                             &from_str("spellck").unwrap()).val0()
-    };
+    let krate = driver::phase_2_configure_and_expand(&sess, krate,
+                                                     &from_str("spellck").unwrap()).val0();
     (sess, krate)
 }

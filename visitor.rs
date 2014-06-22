@@ -1,4 +1,4 @@
-use collections::hashmap;
+use std::collections::{HashMap, HashSet};
 use std::ascii::StrAsciiExt;
 
 use syntax::{ast, visit};
@@ -13,9 +13,9 @@ use words;
 /// through a traversal of the whole ast.
 pub struct SpellingVisitor<'a> {
     /// The reference dictionary.
-    words: &'a hashmap::HashSet<String>,
+    words: &'a HashSet<String>,
     /// The misspelled words, indexed by the span on which they occur.
-    pub misspellings: hashmap::HashMap<Span, hashmap::HashSet<String>>,
+    pub misspellings: HashMap<Span, HashSet<String>>,
 
     /// Whether the traversal should only check documentation, not
     /// idents; gets controlled internally, e.g. for `extern` blocks.
@@ -24,10 +24,10 @@ pub struct SpellingVisitor<'a> {
 
 impl<'a> SpellingVisitor<'a> {
     /// ast::Create a new Spelling Visitor.
-    pub fn new<'a>(words: &'a hashmap::HashSet<String>) -> SpellingVisitor<'a> {
+    pub fn new<'a>(words: &'a HashSet<String>) -> SpellingVisitor<'a> {
         SpellingVisitor {
             words: words,
-            misspellings: hashmap::HashMap::new(),
+            misspellings: HashMap::new(),
             doc_only: false
         }
     }
@@ -49,7 +49,7 @@ impl<'a> SpellingVisitor<'a> {
         for w in words::subwords(w) {
             if !self.raw_word_is_correct(w) {
                 let set =
-                    self.misspellings.find_or_insert_with(sp, |_| hashmap::HashSet::new());
+                    self.misspellings.find_or_insert_with(sp, |_| HashSet::new());
                 set.insert(w.to_string());
             }
         }
@@ -80,11 +80,11 @@ impl<'a> SpellingVisitor<'a> {
     /// spelling.
     fn check_doc_attrs(&mut self, attrs: &[ast::Attribute]) {
         for attr in attrs.iter() {
-            match attr.name_str_pair() {
-                Some((ref doc, ref doc_str)) if "doc" == doc.get() => {
-                    self.check_subwords(doc_str.get(), attr.span);
+            if attr.check_name("doc") {
+                match attr.value_str() {
+                    Some(s) => self.check_subwords(s.get(), attr.span),
+                    None => {}
                 }
-                _ => {}
             }
         }
     }
