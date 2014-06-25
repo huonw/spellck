@@ -1,15 +1,16 @@
 env:
   global:
-    - secure: CVYka56A+CfsyVawDXhbCQyn3rMLbmh81uqrq9O1pE1CwizxQTjX6aCkhSJRC2DU8O8UUp1CzaEKq4SkqTRakh2G9q4f4To2UM0OurLroY1N2j9nNU3IpyRiIMg+QOwh4K0oh06tqOLj9vj2A6B1VdrK26CNo1NjmDzdqtwLw+o=
+    - secure: PA6Wz6hKm/CPwW6LG6wSWf9Ll3qZwZb0VzJw7G2ndLAeylyyyiJPNviVRwuVCVpZNQ/2Zb+1/f5b3y+GshSbWfcbt6TOguQKjHaZuoXTXp+D7upx3PJpApvyMN0kO59Oiq5QXVvkdjLFPR9US4T0uhjY/LFYxs5lipdbFPXimOw=
 before_install:
   - yes | sudo add-apt-repository ppa:hansjorg/rust
+  - yes | sudo add-apt-repository ppa:cmrx64/cargo
   - sudo apt-get update
 install:
-  - sudo apt-get install rust-nightly
+  - sudo apt-get install rust-nightly cargo
 script:
-  - rustc main.rs
-  - rustc --test main.rs -o tester
+  - cargo build
+  - rustc --test src/spellck.rs -o tester
   - ./tester
-  - rustdoc -o doc main.rs
+  - rustdoc -o doc src/spellck.rs
 after_script:
-  - curl http://rust-ci.org/artifacts/putdocs?t=$RUSTCI_TOKEN | sh
+  - curl http://www.rust-ci.org/artifacts/put?t=$RUSTCI_TOKEN | sh

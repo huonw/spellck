@@ -1,0 +1,9 @@
+[package]
+
+name = "spellck"
+version = "0.1.0"
+authors = [ "Huon Wilson <dbau.pp@gmail.com>" ]
+
+[[bin]]
+
+name = "spellck"
