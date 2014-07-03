@@ -19,7 +19,8 @@ too), and run with `./main path/to/crate.rs`.
 letters from `spellck` and `std` & `extra` respectively that are
 correct, but are not in my `/usr/share/dict/words`.
 
-Known to work with Rust commit 7ec7805.
+Known to work with Rust commit 90ab2f8b.
+
 
 <sup>1</sup> Not guaranteed; it should be running the compiler pass
 that checks this, but currently is not doing so.
@@ -34,8 +35,3 @@ that checks this, but currently is not doing so.
 
 - The printing of a span is very naive: just the first line, and so
   for `/** ... */` doc-comments it normally prints just `/**`.
-- `/*! ... */` doc-comments attached to a module get the incorrect
-  span, so they print the next item, not the start of the doc-comment
-  itself.  (This is possibly a more general problem with `/*! ... */`,
-  I haven't investigated yet.)
-- should be using the compiler analysis about exported items.

@@ -1,3 +1,5 @@
+#![allow(warnings)]
+#![crate_type="lib"]
 /*!
 
 There should be exactly 1 output for each `ye s` thing (well, 2 lines
@@ -26,8 +28,8 @@ pub enum yesasdfghjkl {
 
 /// noblahblahblah
 enum nolkjhg {
-    /// yesblahblahblah
-    pub Yeslkjh,
+    /// ye_sblahblahblah
+    pub Ye_slkjh,
     /// noblahblahblah
     Nolkjh
 }
@@ -41,10 +43,7 @@ pub struct yesgfhgsd {
 }
 
 /// yesblahblah
-impl yesgfhgsd { // shouldn't actually appear.
-    /// yesblahblah
-    pub fn yeskkjgfjgfk(&self) {}
-
+impl nogfhgsd {
     /// noblahblah
     fn nokljfjgfg(&self) {}
 }
@@ -66,8 +65,8 @@ pub trait yesfoobar {
     fn yeslkglkfdlg(&self) {}
 }
 
-/// noblahblahblah
-trait nofoobar {
+/// yesblahblahblah
+trait yesfoobarbaz {
     /// noblahblahblah
     fn noaasdfasdfl(&self);
 
@@ -79,8 +78,8 @@ trait nofoobar {
 extern {
     /// yesblahblahblah
     pub fn nollkllll1();
-    // / noblahblahblah (doesn't work)
-    // fn nollkllll2();
+    /// noblahblahblah
+    fn nollkllll2();
     /// yesblahblahblah
     pub static nolkflkdf: uint;
 }
@@ -88,7 +87,7 @@ extern {
 /// yesblahblahblah
 pub fn yeslklkdlkf() {
     /// noblahblahblah
-    pub mod nodfldkf {}
+    mod nodfldkf {}
 }
 
 /// noblahblahblah
@@ -96,4 +95,4 @@ fn nodfjskdfj() {}
 
 
 /// yesttttttttt bbbbbbbbb
-pub fn yestttttt_blahhhhh() {}
+pub fn yesttttttblahhhhh() {}

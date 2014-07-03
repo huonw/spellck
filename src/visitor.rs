@@ -7,6 +7,8 @@ use syntax::parse::token;
 use syntax::codemap::Span;
 use syntax::attr::AttrMetaMethods;
 
+use rustc::middle::privacy::{ExportedItems, PublicItems};
+
 use words;
 
 /// Keeps track of the reference dictionary and the misspelled words
@@ -14,6 +16,13 @@ use words;
 pub struct SpellingVisitor<'a> {
     /// The reference dictionary.
     words: &'a HashSet<String>,
+
+    /// The truly exported items.
+    exported: &'a ExportedItems,
+
+    /// The items that are public in their module.
+    public: &'a PublicItems,
+
     /// The misspelled words, indexed by the span on which they occur.
     pub misspellings: HashMap<Span, HashSet<String>>,
 
@@ -24,9 +33,13 @@ pub struct SpellingVisitor<'a> {
 
 impl<'a> SpellingVisitor<'a> {
     /// ast::Create a new Spelling Visitor.
-    pub fn new<'a>(words: &'a HashSet<String>) -> SpellingVisitor<'a> {
+    pub fn new<'a>(words: &'a HashSet<String>,
+                   exported: &'a ExportedItems,
+                   public: &'a PublicItems) -> SpellingVisitor<'a> {
         SpellingVisitor {
             words: words,
+            exported: exported,
+            public: public,
             misspellings: HashMap::new(),
             doc_only: false
         }
@@ -126,27 +139,26 @@ impl<'a> Visitor<()> for SpellingVisitor<'a> {
         }
     }
     fn visit_foreign_item(&mut self, foreign_item: &ast::ForeignItem, _env: ()) {
-        // don't check the ident; there's nothing the user can do to
-        // control the name.
-        if foreign_item.vis == ast::Public {
-            // (the visibility rules seems to be strange here, pub is
-            // just ignored)
+        if self.exported.contains(&foreign_item.id) {
+            // don't check the ident; there's nothing the user can do to
+            // control the name.
             self.check_doc_attrs(foreign_item.attrs.as_slice());
         }
     }
+
     fn visit_item(&mut self, item: &ast::Item, env: ()) {
-        // no need to check the names/docs of non-Public things
-        // (although there may be ast::Public things inside them that
-        // are re-exported somewhere else, so still recur).
-        let should_check_doc = item.vis == ast::Public || match item.node {
+        let is_impl = match item.node {
             ast::ItemImpl(..) => true,
             _ => false
         };
+        let is_exported = self.exported.contains(&item.id);
+        let is_public = self.public.contains(&item.id);
 
-        if item.vis == ast::Public {
+        // checking names in impl headers is pointless: they're declared elsewhere.
+        if is_exported && !is_impl {
             self.check_ident(item.ident, item.span);
         }
-        if should_check_doc {
+        if is_exported {
             self.check_doc_attrs(item.attrs.as_slice());
         }
 
@@ -155,8 +167,8 @@ impl<'a> Visitor<()> for SpellingVisitor<'a> {
             // hand. This is probably (subtly or otherwise) incorrect
             // wrt to visibility.
             ast::ItemEnum(ref ed, _) => {
-                if item.vis == ast::Public {
-                    for var in ed.variants.iter() {
+                for var in ed.variants.iter() {
+                    if self.exported.contains(&var.node.id) {
                         self.check_ident(var.node.name, var.span);
                         self.check_doc_attrs(var.node.attrs.as_slice());
                     }
@@ -168,7 +180,7 @@ impl<'a> Visitor<()> for SpellingVisitor<'a> {
             // impl Type { ... }
             ast::ItemImpl(_, None, _, ref methods) => {
                 for &method in methods.iter() {
-                    if method.vis == ast::Public {
+                    if self.exported.contains(&method.id) {
                         self.check_ident(method.ident, method.span);
                         self.check_doc_attrs(method.attrs.as_slice());
                     }
@@ -182,7 +194,7 @@ impl<'a> Visitor<()> for SpellingVisitor<'a> {
                 visit::walk_item(self, item, env);
                 self.doc_only = old_d_o;
             }
-            ast::ItemTrait(..) if item.vis == ast::Public => {
+            ast::ItemTrait(..) if is_public => {
                 visit::walk_item(self, item, env)
             }
             _ => {}

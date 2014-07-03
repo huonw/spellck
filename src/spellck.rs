@@ -13,6 +13,7 @@ use std::collections::{HashSet, PriorityQueue};
 use syntax::ast;
 use syntax::codemap::{Span, BytePos, CodeMap};
 use rustc::driver::{driver, session, config};
+use rustc::middle::privacy;
 
 pub mod words;
 mod visitor;
@@ -51,10 +52,10 @@ fn main() {
     let mut any_mistakes = false;
 
     for name in matches.free.iter() {
-        let (sess, krate) = get_ast(Path::new(name.as_slice()));
+        let (sess, krate, export, public) = get_ast(Path::new(name.as_slice()));
         let cm = sess.codemap();
 
-        let mut visitor = visitor::SpellingVisitor::new(&words);
+        let mut visitor = visitor::SpellingVisitor::new(&words, &export, &public);
         visitor.check_crate(&krate);
 
         struct Sort<'a> {
@@ -67,9 +68,8 @@ fn main() {
             }
         }
         impl<'a> PartialOrd for Sort<'a> {
-            fn lt(&self, other: &Sort<'a>) -> bool {
-                self.sp.lo < other.sp.lo ||
-                    (self.sp.lo == other.sp.lo && self.sp.hi < other.sp.hi)
+            fn partial_cmp(&self, other: &Sort<'a>) -> Option<Ordering> {
+                Some(self.cmp(other))
             }
         }
         impl<'a> Eq for Sort<'a> {}
@@ -139,7 +139,8 @@ fn read_lines_into<E: Extendable<String>>
 
 /// Extract the expanded ast of a crate, along with the codemap which
 /// connects source code locations to the actual code.
-fn get_ast(path: Path) -> (session::Session, ast::Crate) {
+fn get_ast(path: Path) -> (session::Session, ast::Crate,
+                           privacy::ExportedItems, privacy::PublicItems) {
     use syntax::diagnostic;
 
     // cargo culted from rustdoc_ng :(
@@ -162,7 +163,10 @@ fn get_ast(path: Path) -> (session::Session, ast::Crate) {
     let cfg = config::build_configuration(&sess);
 
     let krate = driver::phase_1_parse_input(&sess, cfg, &input);
-    let krate = driver::phase_2_configure_and_expand(&sess, krate,
-                                                     &from_str("spellck").unwrap()).val0();
-    (sess, krate)
+    let (krate, map) = driver::phase_2_configure_and_expand(&sess, krate,
+                                                            &from_str("spellck").unwrap()).unwrap();
+    let driver::CrateAnalysis {
+        exported_items, public_items, ty_cx, ..
+        } = driver::phase_3_run_analysis_passes(sess, &krate, map);
+    (ty_cx.sess, krate, exported_items, public_items)
 }
