@@ -24,7 +24,11 @@ This is Cargo-enabled, and can be used as a normal cargo dependency.
 
 ## Lint
 
-The compiler plugin is simply used by loading the crate as a plugin.
+The compiler plugin is simply used by loading the crate as a
+plugin. This causes the compiler to emit warnings (by default) for
+incorrect words via the `misspellings` lint (that is, one can use
+`#[deny(misspellings)]` to make mistakes errors, and
+`#[allow(misspellings)]` to stop the warnings, like with other lints).
 
 Any uses of the plugin must have the `SPELLCK_LINT_DICT` environment
 variable specified, pointing at the dictionary files to be used
@@ -33,6 +37,7 @@ variable specified, pointing at the dictionary files to be used
 plugins cannot take any arguments yet.
 
 ```toml
+// Cargo.toml
 [package]
 name = "spellck_example"
 version = "0.0.0"
@@ -70,6 +75,14 @@ spellck_example.rs:7 pub fn mispelled() {}
                      ^~~~~~~~~~~~~~~~~~~~~
 ```
 
+At the moment, the explicit `extern crate` is required as there is no
+other way to load plugins
+([#15446](https://github.com/rust-lang/rust/issues/15446)). The
+`extern crate` declaration could have a `#[cfg(check_spelling)]`
+attribute, so that the lint is only loaded and run when compiled with
+`--cfg check_spelling` is specified.
+
+
 ## Standalone
 
 The standalone binary `spellck_standalone` does not require loading a
@@ -89,4 +102,4 @@ dictionary.
   for `/** ... */` doc-comments it normally prints just `/**`.
 - `pub use mispelled = foo::bar::baz;` is not warned about.
 - Could perform stemming.
-- Could offer suggestions, e.g. [Norvig's basic corrector](http://norvig.com/spell-correct.html)
+- Could offer suggestions, e.g. [Norvig's basic corrector](http://norvig.com/spell-correct.html).
