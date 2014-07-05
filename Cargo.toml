@@ -1,9 +1,15 @@
 [package]
 
 name = "spellck"
-version = "0.1.0"
+version = "0.2.0"
 authors = [ "Huon Wilson <dbau.pp@gmail.com>" ]
+
+[[lib]]
+
+name = "spellck"
+path = "src/spellck/lib.rs"
+crate_type = ["dylib"]
 
 [[bin]]
 
-name = "spellck"
+name = "spellck_standalone"

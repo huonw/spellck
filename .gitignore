@@ -1,3 +1,5 @@
-main
-spellck
+doc/
 target/
+*.rlib
+*.so
+*.dylib

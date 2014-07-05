@@ -8,9 +8,7 @@ before_install:
 install:
   - sudo apt-get install rust-nightly cargo
 script:
-  - cargo build
-  - rustc --test src/spellck.rs -o tester
-  - ./tester
-  - rustdoc -o doc src/spellck.rs
+  - cargo build && rustc --test src/spellck/lib.rs -o tester &&  ./tester
+  - rustdoc -o doc src/spellck/lib.rs
 after_script:
   - curl http://www.rust-ci.org/artifacts/put?t=$RUSTCI_TOKEN | sh

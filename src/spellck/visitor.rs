@@ -1,15 +1,49 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::{TreeMap, HashSet};
 use std::ascii::StrAsciiExt;
 
-use syntax::{ast, visit};
-use syntax::visit::Visitor;
-use syntax::parse::token;
-use syntax::codemap::Span;
-use syntax::attr::AttrMetaMethods;
+use std::cmp;
 
-use rustc::middle::privacy::{ExportedItems, PublicItems};
+use syntax::{ast, visit};
+use syntax::parse::token;
+use syntax::codemap::{Span, BytePos};
+use syntax::attr::AttrMetaMethods;
+use syntax::ast::NodeId;
+
+use rustc::middle::privacy::ExportedItems;
 
 use words;
+
+pub struct Position {
+    pub span: Span,
+    pub id: NodeId,
+}
+impl Position {
+    fn new(sp: Span, id: NodeId) -> Position {
+        Position { span: sp, id: id, }
+    }
+}
+
+impl PartialEq for Position {
+    fn eq(&self, other: &Position) -> bool {
+        self.cmp(other) == Equal
+    }
+}
+impl Eq for Position {}
+impl PartialOrd for Position {
+    fn partial_cmp(&self, other: &Position) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+impl Ord for Position {
+    fn cmp(&self, other: &Position) -> Ordering {
+        let Span { lo: BytePos(slo), hi: BytePos(shi), .. } = self.span;
+        let Span { lo: BytePos(olo), hi: BytePos(ohi), .. } = other.span;
+        // order by span, and then by ID.
+        cmp::lexical_ordering(
+            cmp::lexical_ordering(slo.cmp(&olo), shi.cmp(&ohi)),
+            self.id.cmp(&other.id))
+    }
+}
 
 /// Keeps track of the reference dictionary and the misspelled words
 /// through a traversal of the whole ast.
@@ -20,11 +54,8 @@ pub struct SpellingVisitor<'a> {
     /// The truly exported items.
     exported: &'a ExportedItems,
 
-    /// The items that are public in their module.
-    public: &'a PublicItems,
-
-    /// The misspelled words, indexed by the span on which they occur.
-    pub misspellings: HashMap<Span, HashSet<String>>,
+    /// The misspelled words
+    pub misspellings: TreeMap<Position, Vec<String>>,
 
     /// Whether the traversal should only check documentation, not
     /// idents; gets controlled internally, e.g. for `extern` blocks.
@@ -34,13 +65,11 @@ pub struct SpellingVisitor<'a> {
 impl<'a> SpellingVisitor<'a> {
     /// ast::Create a new Spelling Visitor.
     pub fn new<'a>(words: &'a HashSet<String>,
-                   exported: &'a ExportedItems,
-                   public: &'a PublicItems) -> SpellingVisitor<'a> {
+                   exported: &'a ExportedItems) -> SpellingVisitor<'a> {
         SpellingVisitor {
             words: words,
             exported: exported,
-            public: public,
-            misspellings: HashMap::new(),
+            misspellings: TreeMap::new(),
             doc_only: false
         }
     }
@@ -58,24 +87,30 @@ impl<'a> SpellingVisitor<'a> {
     /// and `FooBar` into `foo` & `bar` and `Foo` & `Bar`
     /// respectively. This inserts any incorrect word(s) into the
     /// misspelling map.
-    fn check_subwords(&mut self, w: &str, sp: Span) {
+    fn check_subwords(&mut self, w: &str, pos: Position) {
         for w in words::subwords(w) {
             if !self.raw_word_is_correct(w) {
-                let set =
-                    self.misspellings.find_or_insert_with(sp, |_| HashSet::new());
-                set.insert(w.to_string());
+                let w = w.to_string();
+                match self.misspellings.find_mut(&pos) {
+                    Some(v) => {
+                        v.push(w);
+                        continue
+                    }
+                    None => {}
+                }
+                self.misspellings.insert(pos, vec![w]);
             }
         }
     }
 
     /// Check a single ident for misspellings; possibly separating it
     /// into subwords.
-    fn check_ident(&mut self, id: ast::Ident, sp: Span) {
+    fn check_ident(&mut self, ident: ast::Ident, pos: Position) {
         if self.doc_only { return }
 
         // spooky action at a distance; extracts the string
         // representation from TLS.
-        let word_ = token::get_ident(id);
+        let word_ = token::get_ident(ident);
         let word = word_.get();
         // secret rust internals, e.g. __std_macros
         if word.starts_with("__") { return }
@@ -86,16 +121,16 @@ impl<'a> SpellingVisitor<'a> {
             return
         }
 
-        self.check_subwords(word, sp);
+        self.check_subwords(word, pos);
     }
 
     /// Check the #[doc="..."] (and the commment forms) attributes for
     /// spelling.
-    fn check_doc_attrs(&mut self, attrs: &[ast::Attribute]) {
+    fn check_doc_attrs(&mut self, attrs: &[ast::Attribute], id: NodeId) {
         for attr in attrs.iter() {
             if attr.check_name("doc") {
                 match attr.value_str() {
-                    Some(s) => self.check_subwords(s.get(), attr.span),
+                    Some(s) => self.check_subwords(s.get(), Position::new(attr.span, id)),
                     None => {}
                 }
             }
@@ -104,7 +139,7 @@ impl<'a> SpellingVisitor<'a> {
 
     /// Spell-check a whole krate.
     pub fn check_crate(&mut self, krate: &ast::Crate) {
-        self.check_doc_attrs(krate.attrs.as_slice());
+        self.check_doc_attrs(krate.attrs.as_slice(), ast::CRATE_NODE_ID);
         visit::walk_crate(self, krate, ())
     }
 }
@@ -112,24 +147,18 @@ impl<'a> SpellingVisitor<'a> {
 // visits anything that could be visible to the outside world,
 // e.g. documentation, pub fns, pub mods etc and checks their
 // spelling.
-impl<'a> Visitor<()> for SpellingVisitor<'a> {
-    fn visit_mod(&mut self,
-                 module: &ast::Mod,
-                 _span: Span,
-                 _node_id: ast::NodeId,
-                 env: ()) {
-        visit::walk_mod(self, module, env)
-    }
+impl<'a> visit::Visitor<()> for SpellingVisitor<'a> {
     fn visit_view_item(&mut self, view_item: &ast::ViewItem, _env: ()) {
         // only check the ident for `use self = foo;`; since there's
         // nothing else the user can do to control the name.
         if view_item.vis == ast::Public {
-            self.check_doc_attrs(view_item.attrs.as_slice());
+            // FIXME: no node ids
+            // self.check_doc_attrs(view_item.attrs.as_slice());
             match view_item.node {
                 ast::ViewItemUse(ref vp) => {
                     match vp.node {
-                        ast::ViewPathSimple(id, _, _) => {
-                            self.check_ident(id, vp.span);
+                        ast::ViewPathSimple(_ident, _, _) => {
+                            // self.check_ident(id, vp.span);
                         }
                         _ => {}
                     }
@@ -142,7 +171,7 @@ impl<'a> Visitor<()> for SpellingVisitor<'a> {
         if self.exported.contains(&foreign_item.id) {
             // don't check the ident; there's nothing the user can do to
             // control the name.
-            self.check_doc_attrs(foreign_item.attrs.as_slice());
+            self.check_doc_attrs(foreign_item.attrs.as_slice(), foreign_item.id);
         }
     }
 
@@ -152,14 +181,13 @@ impl<'a> Visitor<()> for SpellingVisitor<'a> {
             _ => false
         };
         let is_exported = self.exported.contains(&item.id);
-        let is_public = self.public.contains(&item.id);
 
         // checking names in impl headers is pointless: they're declared elsewhere.
         if is_exported && !is_impl {
-            self.check_ident(item.ident, item.span);
+            self.check_ident(item.ident, Position::new(item.span, item.id));
         }
         if is_exported {
-            self.check_doc_attrs(item.attrs.as_slice());
+            self.check_doc_attrs(item.attrs.as_slice(), item.id);
         }
 
         match item.node {
@@ -169,8 +197,8 @@ impl<'a> Visitor<()> for SpellingVisitor<'a> {
             ast::ItemEnum(ref ed, _) => {
                 for var in ed.variants.iter() {
                     if self.exported.contains(&var.node.id) {
-                        self.check_ident(var.node.name, var.span);
-                        self.check_doc_attrs(var.node.attrs.as_slice());
+                        self.check_ident(var.node.name, Position::new(var.span, var.node.id));
+                        self.check_doc_attrs(var.node.attrs.as_slice(), var.node.id);
                     }
                 }
             }
@@ -181,8 +209,8 @@ impl<'a> Visitor<()> for SpellingVisitor<'a> {
             ast::ItemImpl(_, None, _, ref methods) => {
                 for &method in methods.iter() {
                     if self.exported.contains(&method.id) {
-                        self.check_ident(method.ident, method.span);
-                        self.check_doc_attrs(method.attrs.as_slice());
+                        self.check_ident(method.ident, Position::new(method.span, method.id));
+                        self.check_doc_attrs(method.attrs.as_slice(), method.id);
                     }
                 }
             }
@@ -194,7 +222,7 @@ impl<'a> Visitor<()> for SpellingVisitor<'a> {
                 visit::walk_item(self, item, env);
                 self.doc_only = old_d_o;
             }
-            ast::ItemTrait(..) if is_public => {
+            ast::ItemTrait(..) if item.vis == ast::Public => {
                 visit::walk_item(self, item, env)
             }
             _ => {}
@@ -202,8 +230,8 @@ impl<'a> Visitor<()> for SpellingVisitor<'a> {
     }
 
     fn visit_ty_method(&mut self, method_type: &ast::TypeMethod, env: ()) {
-        self.check_doc_attrs(method_type.attrs.as_slice());
-        self.check_ident(method_type.ident, method_type.span);
+        self.check_doc_attrs(method_type.attrs.as_slice(), method_type.id);
+        self.check_ident(method_type.ident, Position::new(method_type.span, method_type.id));
         visit::walk_ty_method(self, method_type, env)
     }
     fn visit_trait_method(&mut self, trait_method: &ast::TraitMethod, env: ()) {
@@ -212,8 +240,8 @@ impl<'a> Visitor<()> for SpellingVisitor<'a> {
                 visit::walk_trait_method(self, trait_method, env)
             }
             ast::Provided(method) => {
-                self.check_doc_attrs(method.attrs.as_slice());
-                self.check_ident(method.ident, method.span);
+                self.check_doc_attrs(method.attrs.as_slice(), method.id);
+                self.check_ident(method.ident, Position::new(method.span, method.id));
             }
         }
     }
@@ -230,11 +258,13 @@ impl<'a> Visitor<()> for SpellingVisitor<'a> {
     }
     fn visit_struct_field(&mut self, struct_field: &ast::StructField, _env: ()) {
         match struct_field.node.kind {
-            ast::NamedField(id, vis) => {
+            ast::NamedField(ident, vis) => {
                 match vis {
                     ast::Public => {
-                        self.check_ident(id, struct_field.span);
-                        self.check_doc_attrs(struct_field.node.attrs.as_slice());
+                        self.check_ident(ident,
+                                         Position::new(struct_field.span, struct_field.node.id));
+                        self.check_doc_attrs(struct_field.node.attrs.as_slice(),
+                                             struct_field.node.id);
                     }
                     ast::Inherited => {}
                 }

@@ -1,4 +1,4 @@
-#![crate_id="spellck"]
+#![crate_id="spellck_standalone"]
 #![deny(missing_doc)]
 #![feature(managed_boxes)]
 
@@ -8,6 +8,9 @@
 extern crate getopts;
 extern crate syntax;
 extern crate rustc;
+
+extern crate spellck;
+
 use std::{io, os, cmp};
 use std::collections::{HashSet, PriorityQueue};
 use syntax::ast;
@@ -15,8 +18,7 @@ use syntax::codemap::{Span, BytePos, CodeMap};
 use rustc::driver::{driver, session, config};
 use rustc::middle::privacy;
 
-pub mod words;
-mod visitor;
+use spellck::visitor::SpellingVisitor;
 
 static DEFAULT_DICT: &'static str = "/usr/share/dict/words";
 static LIBDIR: &'static str = "/usr/local/lib/rustlib/x86_64-unknown-linux-gnu/lib";
@@ -52,15 +54,15 @@ fn main() {
     let mut any_mistakes = false;
 
     for name in matches.free.iter() {
-        let (sess, krate, export, public) = get_ast(Path::new(name.as_slice()));
+        let (sess, krate, export, _public) = get_ast(Path::new(name.as_slice()));
         let cm = sess.codemap();
 
-        let mut visitor = visitor::SpellingVisitor::new(&words, &export, &public);
+        let mut visitor = SpellingVisitor::new(&words, &export);
         visitor.check_crate(&krate);
 
         struct Sort<'a> {
             sp: Span,
-            words: &'a HashSet<String>
+            words: &'a Vec<String>
         }
         impl<'a> PartialEq for Sort<'a> {
             fn eq(&self, other: &Sort<'a>) -> bool {
@@ -84,7 +86,7 @@ fn main() {
         // extract the lines in order of the spans, so that e.g. files
         // are grouped together, and lines occur in increasing order.
         let pq: PriorityQueue<Sort> =
-            visitor.misspellings.iter().map(|(k, v)| Sort { sp: *k, words: v }).collect();
+            visitor.misspellings.iter().map(|(pos, v)| Sort { sp: pos.span, words: v }).collect();
 
         // run through the spans, printing the words that are
         // apparently misspelled
