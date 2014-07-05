@@ -2,14 +2,14 @@
 
 [![Build Status](https://travis-ci.org/huonw/spellck.png)](https://travis-ci.org/huonw/spellck)
 
-A public API spell-checker plugin for the Rust compiler. Examines most
-`pub` things like `mod`s, `fn`s, `struct`s and their fields, `enum`s
-and their variants, as well as their documentation for spelling
-errors.  It acts in a very naive way: just comparing the words with a
-dictionary.
+A public API spell-checker plugin for the `rustc` Rust compiler. It
+finds spelling errors in the names and documentation of most exported
+things like `mod`s, `fn`s, `struct`s and their fields, `enum`s and
+their variants.
 
-It breaks idents like `foo_bar` and `FooBar` into `foo` and `bar`, and
-ignores any numbers/non-alphanumeric characters.
+Identifiers like `foo_bar` and `FooBar` are broken into `foo` and
+`bar`, with numbers/non-alphabetic characters acting as separators. It
+acts in a very naive way: just comparing the words with a dictionary.
 
 The dictionary format is just a listing of words, one per
 line. `src/stdlib.txt` is the words/abbreviations/sequences of letters
@@ -20,21 +20,18 @@ Known to work with Rust commit 90ab2f8.
 
 ## Installation
 
-This is Cargo-enabled, and can be used as a normal cargo dependency.
+This is Cargo-enabled, and can be used as a normal Cargo
+dependency. Both the library/compiler plugin and the standalone
+executable are built with `cargo build`.
 
 ## Lint
 
-The compiler plugin is simply used by loading the crate as a
-plugin. This causes the compiler to emit warnings (by default) for
-incorrect words via the `misspellings` lint (that is, one can use
+The checker comes as compiler plugin that enables it to run during the
+normal compilation process, it is used by simply loading the crate as
+a plugin. This causes the compiler to emit warnings (by default) for
+incorrect words via the `misspellings` lint; one can use
 `#[deny(misspellings)]` to make mistakes errors, and
-`#[allow(misspellings)]` to stop the warnings, like with other lints).
-
-Any uses of the plugin must have the `SPELLCK_LINT_DICT` environment
-variable specified, pointing at the dictionary files to be used
-(multiple can be specified, in the same format as the platform's
-`PATH` variable). This is required because, unfortunately, compiler
-plugins cannot take any arguments yet.
+`#[allow(misspellings)]` to stop the warnings, like with other lints.
 
 ```toml
 # Cargo.toml
@@ -60,11 +57,21 @@ crate_type = ["lib"]
 
 /// Bad dok coment
 pub fn mispelled() {}
+
+#[allow(misspellings)]
+/// This is public, but poor speeling won't get a warning.
+pub struct Notaword {
+    pub madeuptext: uint
+}
 ```
+
+Any uses of the plugin must have the `SPELLCK_LINT_DICT` environment
+variable specified, pointing at the dictionary files to be used
+(compiler plugins cannot take any arguments yet). Multiple can be
+specified, in the same format as the platform's `PATH` variable.
 
 ```
 $ SPELLCK_LINT_DICT=/usr/share/dict/words cargo build
-SPELLCK_LINT_DICT=/usr/share/dict/words cargo build
        Fresh spellck v0.2.0 (https://github.com/huonw/spellck)
    Compiling spellck_example v0.0.0 (file:...)
 spellck_example.rs:6:1: 6:19 warning: misspelled words: dok, coment, #[warn(misspellings)] on by default
@@ -88,7 +95,8 @@ attribute, so that the lint is only loaded and run when compiled with
 The standalone binary `spellck_standalone` does not require loading a
 compiler plugin, it is used like `spellck_standalone
 crate_file.rs`. This defaults to using `/usr/share/dict/words` as the
-dictionary.
+dictionary. (A default `cargo build` will output the resulting binary
+as `target/spellck_standalone`.)
 
 ### Args
 
