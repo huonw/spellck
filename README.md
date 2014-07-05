@@ -99,7 +99,11 @@ dictionary.
 ## Known bugs/desirable features
 
 - The printing of a span is very naive: just the first line, and so
-  for `/** ... */` doc-comments it normally prints just `/**`.
-- `pub use mispelled = foo::bar::baz;` is not warned about.
-- Could perform stemming.
-- Could offer suggestions, e.g. [Norvig's basic corrector](http://norvig.com/spell-correct.html).
+  for `/** ... */` doc-comments it normally prints just `/**`
+  ([#7](https://github.com/huonw/spellck/issues/7)).
+- `pub use mispelled = foo::bar::baz;` is not warned
+  about ([#6](https://github.com/huonw/spellck/issues/6)).
+- Could perform stemming ([#5](https://github.com/huonw/spellck/issues/5)).
+- Could offer suggestions,
+  e.g. [Norvig's basic corrector](http://norvig.com/spell-correct.html)
+  ([#4](https://github.com/huonw/spellck/issues/4)).

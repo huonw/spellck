@@ -152,7 +152,7 @@ impl<'a> visit::Visitor<()> for SpellingVisitor<'a> {
         // only check the ident for `use self = foo;`; since there's
         // nothing else the user can do to control the name.
         if view_item.vis == ast::Public {
-            // FIXME: no node ids
+            // FIXME #6: no node ids
             // self.check_doc_attrs(view_item.attrs.as_slice());
             match view_item.node {
                 ast::ViewItemUse(ref vp) => {
