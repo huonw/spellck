@@ -37,7 +37,7 @@ variable specified, pointing at the dictionary files to be used
 plugins cannot take any arguments yet.
 
 ```toml
-// Cargo.toml
+# Cargo.toml
 [package]
 name = "spellck_example"
 version = "0.0.0"
@@ -95,15 +95,3 @@ dictionary.
 - `-d`, `--dict`: supply an extra dictionary, one word per line (can
   be listed multiple times)
 - `-n`, `--no-def-dict`: don't load `/usr/share/dict/words` by default
-
-## Known bugs/desirable features
-
-- The printing of a span is very naive: just the first line, and so
-  for `/** ... */` doc-comments it normally prints just `/**`
-  ([#7](https://github.com/huonw/spellck/issues/7)).
-- `pub use mispelled = foo::bar::baz;` is not warned
-  about ([#6](https://github.com/huonw/spellck/issues/6)).
-- Could perform stemming ([#5](https://github.com/huonw/spellck/issues/5)).
-- Could offer suggestions,
-  e.g. [Norvig's basic corrector](http://norvig.com/spell-correct.html)
-  ([#4](https://github.com/huonw/spellck/issues/4)).
