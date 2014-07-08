@@ -1,4 +1,4 @@
-#![crate_id="spellck_standalone"]
+#![crate_name = "spellck_standalone"]
 #![deny(missing_doc)]
 #![feature(managed_boxes)]
 
@@ -144,6 +144,7 @@ fn read_lines_into<E: Extendable<String>>
 fn get_ast(path: Path) -> (session::Session, ast::Crate,
                            privacy::ExportedItems, privacy::PublicItems) {
     use syntax::diagnostic;
+    use rustc::back::link;
 
     // cargo culted from rustdoc_ng :(
     let input = driver::FileInput(path);
@@ -165,10 +166,12 @@ fn get_ast(path: Path) -> (session::Session, ast::Crate,
     let cfg = config::build_configuration(&sess);
 
     let krate = driver::phase_1_parse_input(&sess, cfg, &input);
+    let id = link::find_crate_name(Some(&sess), krate.attrs.as_slice(),
+                                   &input);
     let (krate, map) = driver::phase_2_configure_and_expand(&sess, krate,
-                                                            &from_str("spellck").unwrap()).unwrap();
+                                                            id.as_slice()).unwrap();
     let driver::CrateAnalysis {
         exported_items, public_items, ty_cx, ..
-        } = driver::phase_3_run_analysis_passes(sess, &krate, map);
+        } = driver::phase_3_run_analysis_passes(sess, &krate, map, id);
     (ty_cx.sess, krate, exported_items, public_items)
 }

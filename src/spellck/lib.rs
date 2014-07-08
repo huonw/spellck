@@ -1,4 +1,4 @@
-#![crate_id = "spellck"]
+#![crate_name = "spellck"]
 #![feature(phase, plugin_registrar)]
 
 
