@@ -32,7 +32,7 @@ fn main() {
 
     let matches = getopts::getopts(args.tail(), opts).unwrap();
     if matches.opt_present("help") {
-        println!("{}", getopts::usage(args.get(0).as_slice(), opts));
+        println!("{}", getopts::usage(args[0].as_slice(), opts));
         return;
     }
 
@@ -94,7 +94,7 @@ fn main() {
             any_mistakes = true;
 
             let lines = cm.span_to_lines(sp);
-            let sp_text = cm.span_to_str(sp);
+            let sp_text = cm.span_to_string(sp);
 
             // [] required for connect :(
             let word_vec: Vec<&str> = words.iter().map(|s| s.as_slice()).collect();
@@ -157,7 +157,7 @@ fn get_ast(path: Path) -> (session::Session, ast::Crate,
     };
 
     let codemap = CodeMap::new();
-    let diagnostic_handler = diagnostic::default_handler(diagnostic::Auto);
+    let diagnostic_handler = diagnostic::default_handler(diagnostic::Auto, None);
     let span_diagnostic_handler =
         diagnostic::mk_span_handler(diagnostic_handler, codemap);
 

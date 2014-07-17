@@ -8,6 +8,7 @@ use syntax::parse::token;
 use syntax::codemap::{Span, BytePos};
 use syntax::attr::AttrMetaMethods;
 use syntax::ast::NodeId;
+use syntax::ast_util::PostExpansionMethod;
 
 use rustc::middle::privacy::ExportedItems;
 
@@ -209,7 +210,7 @@ impl<'a> visit::Visitor<()> for SpellingVisitor<'a> {
             ast::ItemImpl(_, None, _, ref methods) => {
                 for &method in methods.iter() {
                     if self.exported.contains(&method.id) {
-                        self.check_ident(method.ident, Position::new(method.span, method.id));
+                        self.check_ident(method.pe_ident(), Position::new(method.span, method.id));
                         self.check_doc_attrs(method.attrs.as_slice(), method.id);
                     }
                 }
@@ -241,7 +242,7 @@ impl<'a> visit::Visitor<()> for SpellingVisitor<'a> {
             }
             ast::Provided(method) => {
                 self.check_doc_attrs(method.attrs.as_slice(), method.id);
-                self.check_ident(method.ident, Position::new(method.span, method.id));
+                self.check_ident(method.pe_ident(), Position::new(method.span, method.id));
             }
         }
     }

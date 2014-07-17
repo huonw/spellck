@@ -8,7 +8,7 @@ authors = [ "Huon Wilson <dbau.pp@gmail.com>" ]
 
 name = "spellck"
 path = "src/spellck/lib.rs"
-crate_type = ["dylib"]
+plugin = true
 
 [[bin]]
 
