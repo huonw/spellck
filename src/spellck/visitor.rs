@@ -1,8 +1,6 @@
 use std::collections::{TreeMap, HashSet};
 use std::ascii::StrAsciiExt;
 
-use std::cmp;
-
 use syntax::{ast, visit};
 use syntax::parse::token;
 use syntax::codemap::{Span, BytePos};
@@ -40,9 +38,7 @@ impl Ord for Position {
         let Span { lo: BytePos(slo), hi: BytePos(shi), .. } = self.span;
         let Span { lo: BytePos(olo), hi: BytePos(ohi), .. } = other.span;
         // order by span, and then by ID.
-        cmp::lexical_ordering(
-            cmp::lexical_ordering(slo.cmp(&olo), shi.cmp(&ohi)),
-            self.id.cmp(&other.id))
+        (slo, shi, self.id).cmp(&(olo, ohi, other.id))
     }
 }
 

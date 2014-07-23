@@ -11,7 +11,7 @@ extern crate rustc;
 
 extern crate spellck;
 
-use std::{io, os, cmp};
+use std::{io, os};
 use std::collections::{HashSet, PriorityQueue};
 use syntax::ast;
 use syntax::codemap::{Span, BytePos, CodeMap};
@@ -79,7 +79,7 @@ fn main() {
             fn cmp(&self, other: &Sort<'a>) -> Ordering {
                 let Span { lo: BytePos(slo), hi: BytePos(shi), .. } = self.sp;
                 let Span { lo: BytePos(olo), hi: BytePos(ohi), .. } = other.sp;
-                cmp::lexical_ordering(slo.cmp(&olo), shi.cmp(&ohi))
+                (slo, shi).cmp(&(olo, ohi))
             }
         }
 
@@ -169,7 +169,7 @@ fn get_ast(path: Path) -> (session::Session, ast::Crate,
     let id = link::find_crate_name(Some(&sess), krate.attrs.as_slice(),
                                    &input);
     let (krate, map) = driver::phase_2_configure_and_expand(&sess, krate,
-                                                            id.as_slice()).unwrap();
+                                                            id.as_slice(), None).unwrap();
     let driver::CrateAnalysis {
         exported_items, public_items, ty_cx, ..
         } = driver::phase_3_run_analysis_passes(sess, &krate, map, id);
