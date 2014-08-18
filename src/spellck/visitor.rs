@@ -203,11 +203,16 @@ impl<'a> visit::Visitor<()> for SpellingVisitor<'a> {
                 visit::walk_item(self, item, env)
             }
             // impl Type { ... }
-            ast::ItemImpl(_, None, _, ref methods) => {
-                for &method in methods.iter() {
-                    if self.exported.contains(&method.id) {
-                        self.check_ident(method.pe_ident(), Position::new(method.span, method.id));
-                        self.check_doc_attrs(method.attrs.as_slice(), method.id);
+            ast::ItemImpl(_, None, _, ref items) => {
+                for item in items.iter() {
+                    match *item {
+                        ast::MethodImplItem(method) => {
+                            if self.exported.contains(&method.id) {
+                                self.check_ident(method.pe_ident(),
+                                                 Position::new(method.span, method.id));
+                                self.check_doc_attrs(method.attrs.as_slice(), method.id);
+                            }
+                        }
                     }
                 }
             }
@@ -231,12 +236,12 @@ impl<'a> visit::Visitor<()> for SpellingVisitor<'a> {
         self.check_ident(method_type.ident, Position::new(method_type.span, method_type.id));
         visit::walk_ty_method(self, method_type, env)
     }
-    fn visit_trait_method(&mut self, trait_method: &ast::TraitMethod, env: ()) {
-        match *trait_method {
-            ast::Required(_) => {
-                visit::walk_trait_method(self, trait_method, env)
+    fn visit_trait_item(&mut self, trait_item: &ast::TraitItem, env: ()) {
+        match *trait_item {
+            ast::RequiredMethod(_) => {
+                visit::walk_trait_item(self, trait_item, env)
             }
-            ast::Provided(method) => {
+            ast::ProvidedMethod(method) => {
                 self.check_doc_attrs(method.attrs.as_slice(), method.id);
                 self.check_ident(method.pe_ident(), Position::new(method.span, method.id));
             }

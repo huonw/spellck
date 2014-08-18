@@ -4,7 +4,7 @@ name = "spellck"
 version = "0.2.0"
 authors = [ "Huon Wilson <dbau.pp@gmail.com>" ]
 
-[[lib]]
+[lib]
 
 name = "spellck"
 path = "src/spellck/lib.rs"
