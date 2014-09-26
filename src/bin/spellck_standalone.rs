@@ -6,6 +6,7 @@
 //! identifiers of a crate.
 
 extern crate getopts;
+extern crate arena;
 extern crate syntax;
 extern crate rustc;
 
@@ -13,8 +14,9 @@ extern crate spellck;
 
 use std::{io, os};
 use std::collections::{HashSet, PriorityQueue};
-use syntax::ast;
-use syntax::codemap::{Span, BytePos, CodeMap};
+use arena::TypedArena;
+use syntax::{ast, ast_map};
+use syntax::codemap::{Span, BytePos};
 use rustc::driver::{driver, session, config};
 use rustc::middle::privacy;
 
@@ -43,7 +45,7 @@ fn main() {
             return
         }
     }
-    for dict in matches.opt_strs("d").move_iter().chain(matches.opt_strs("dict").move_iter()) {
+    for dict in matches.opt_strs("d").into_iter().chain(matches.opt_strs("dict").into_iter()) {
         if !read_lines_into(&Path::new(dict), &mut words) {
             return
         }
@@ -54,65 +56,66 @@ fn main() {
     let mut any_mistakes = false;
 
     for name in matches.free.iter() {
-        let (sess, krate, export, _public) = get_ast(Path::new(name.as_slice()));
-        let cm = sess.codemap();
+        get_ast(Path::new(name.as_slice()), |sess, krate, export, _public| {
+            let cm = sess.codemap();
 
-        let mut visitor = SpellingVisitor::new(&words, &export);
-        visitor.check_crate(&krate);
+            let mut visitor = SpellingVisitor::new(&words, &export);
+            visitor.check_crate(krate);
 
-        struct Sort<'a> {
-            sp: Span,
-            words: &'a Vec<String>
-        }
-        impl<'a> PartialEq for Sort<'a> {
-            fn eq(&self, other: &Sort<'a>) -> bool {
-                self.sp == other.sp
+            struct Sort<'a> {
+                sp: Span,
+                words: &'a Vec<String>
             }
-        }
-        impl<'a> PartialOrd for Sort<'a> {
-            fn partial_cmp(&self, other: &Sort<'a>) -> Option<Ordering> {
-                Some(self.cmp(other))
-            }
-        }
-        impl<'a> Eq for Sort<'a> {}
-        impl<'a> Ord for Sort<'a> {
-            fn cmp(&self, other: &Sort<'a>) -> Ordering {
-                let Span { lo: BytePos(slo), hi: BytePos(shi), .. } = self.sp;
-                let Span { lo: BytePos(olo), hi: BytePos(ohi), .. } = other.sp;
-                (slo, shi).cmp(&(olo, ohi))
-            }
-        }
-
-        // extract the lines in order of the spans, so that e.g. files
-        // are grouped together, and lines occur in increasing order.
-        let pq: PriorityQueue<Sort> =
-            visitor.misspellings.iter().map(|(pos, v)| Sort { sp: pos.span, words: v }).collect();
-
-        // run through the spans, printing the words that are
-        // apparently misspelled
-        for Sort {sp, words} in pq.into_sorted_vec().move_iter() {
-            any_mistakes = true;
-
-            let lines = cm.span_to_lines(sp);
-            let sp_text = cm.span_to_string(sp);
-
-            // [] required for connect :(
-            let word_vec: Vec<&str> = words.iter().map(|s| s.as_slice()).collect();
-
-            println!("{}: misspelled {words}: {}",
-                     sp_text,
-                     word_vec.connect(", "),
-                     words = if words.len() == 1 {"word"} else {"words"});
-
-            // first line; no lines = no printing
-            match lines.lines.as_slice() {
-                [line_num, ..] => {
-                    let line = lines.file.get_line(line_num as int);
-                    println!("{}: {}", sp_text, line);
+            impl<'a> PartialEq for Sort<'a> {
+                fn eq(&self, other: &Sort<'a>) -> bool {
+                    self.sp == other.sp
                 }
-                _ => {}
             }
-        }
+            impl<'a> PartialOrd for Sort<'a> {
+                fn partial_cmp(&self, other: &Sort<'a>) -> Option<Ordering> {
+                    Some(self.cmp(other))
+                }
+            }
+            impl<'a> Eq for Sort<'a> {}
+            impl<'a> Ord for Sort<'a> {
+                fn cmp(&self, other: &Sort<'a>) -> Ordering {
+                    let Span { lo: BytePos(slo), hi: BytePos(shi), .. } = self.sp;
+                    let Span { lo: BytePos(olo), hi: BytePos(ohi), .. } = other.sp;
+                    (slo, shi).cmp(&(olo, ohi))
+                }
+            }
+
+            // extract the lines in order of the spans, so that e.g. files
+            // are grouped together, and lines occur in increasing order.
+            let pq: PriorityQueue<Sort> =
+                visitor.misspellings.iter().map(|(pos, v)| Sort { sp: pos.span, words: v }).collect();
+
+            // run through the spans, printing the words that are
+            // apparently misspelled
+            for Sort {sp, words} in pq.into_sorted_vec().into_iter() {
+                any_mistakes = true;
+
+                let lines = cm.span_to_lines(sp);
+                let sp_text = cm.span_to_string(sp);
+
+                // [] required for connect :(
+                let word_vec: Vec<&str> = words.iter().map(|s| s.as_slice()).collect();
+
+                println!("{}: misspelled {words}: {}",
+                         sp_text,
+                         word_vec.connect(", "),
+                         words = if words.len() == 1 {"word"} else {"words"});
+
+                // first line; no lines = no printing
+                match lines.lines.as_slice() {
+                    [line_num, ..] => {
+                        let line = lines.file.get_line(line_num as int);
+                        println!("{}: {}", sp_text, line);
+                    }
+                    _ => {}
+                }
+            }
+        })
     }
 
     if any_mistakes {
@@ -141,8 +144,11 @@ fn read_lines_into<E: Extendable<String>>
 
 /// Extract the expanded ast of a crate, along with the codemap which
 /// connects source code locations to the actual code.
-fn get_ast(path: Path) -> (session::Session, ast::Crate,
-                           privacy::ExportedItems, privacy::PublicItems) {
+/// Extract the expanded ast of a krate, along with the codemap which
+/// connects source code locations to the actual code.
+fn get_ast<T>(path: Path,
+              f: |session::Session, &ast::Crate,
+                  privacy::ExportedItems, privacy::PublicItems| -> T) -> T {
     use syntax::diagnostic;
     use rustc::back::link;
 
@@ -152,12 +158,13 @@ fn get_ast(path: Path) -> (session::Session, ast::Crate,
     let sessopts = config::Options {
         maybe_sysroot: Some(os::self_exe_path().unwrap().dir_path()),
         addl_lib_search_paths: std::cell::RefCell::new(
-            (vec![Path::new(LIBDIR)]).move_iter().collect()),
-        .. (config::basic_options()).clone()
+            Some(Path::new(LIBDIR)).into_iter().collect()),
+        .. config::basic_options().clone()
     };
 
-    let codemap = CodeMap::new();
-    let diagnostic_handler = diagnostic::default_handler(diagnostic::Auto, None);
+    let codemap = syntax::codemap::CodeMap::new();
+    let diagnostic_handler =
+        diagnostic::default_handler(diagnostic::Auto, None);
     let span_diagnostic_handler =
         diagnostic::mk_span_handler(diagnostic_handler, codemap);
 
@@ -168,10 +175,13 @@ fn get_ast(path: Path) -> (session::Session, ast::Crate,
     let krate = driver::phase_1_parse_input(&sess, cfg, &input);
     let id = link::find_crate_name(Some(&sess), krate.attrs.as_slice(),
                                    &input);
-    let (krate, map) = driver::phase_2_configure_and_expand(&sess, krate,
-                                                            id.as_slice(), None).unwrap();
+    let krate = driver::phase_2_configure_and_expand(
+        &sess, krate, id.as_slice(), None).unwrap();
+    let mut forest = ast_map::Forest::new(krate);
+    let ast_map = driver::assign_node_ids_and_map(&sess, &mut forest);
+    let type_arena = TypedArena::new();
+    let res = driver::phase_3_run_analysis_passes(sess, ast_map, &type_arena, id);
     let driver::CrateAnalysis {
-        exported_items, public_items, ty_cx, ..
-        } = driver::phase_3_run_analysis_passes(sess, &krate, map, id);
-    (ty_cx.sess, krate, exported_items, public_items)
+        exported_items, public_items, ty_cx, .. } = res;
+    f(ty_cx.sess, ty_cx.map.krate(), exported_items, public_items)
 }

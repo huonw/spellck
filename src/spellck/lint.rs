@@ -1,4 +1,4 @@
-use std::{os, result};
+use std::os;
 use std::io::{File, BufferedReader};
 use std::collections::HashSet ;
 
@@ -32,16 +32,16 @@ impl Misspellings {
             }
         };
 
-        for p in paths.move_iter().map(Path::new) {
+        for p in paths.into_iter().map(Path::new) {
             let words = File::open(&p)
                 .and_then(|f| {
                     let mut rdr = BufferedReader::new(f);
-                    let lines = rdr.lines().map(|l| l.map(|s| s.as_slice().trim().to_string()));
-                    result::collect::<_, _, _, Vec<String>>(lines)
+                    let mut lines = rdr.lines().map(|l| l.map(|s| s.as_slice().trim().to_string()));
+                    lines.collect::<Result<Vec<String>, _>>()
                 });
 
             match words {
-                Ok(w) => ret.words.extend(w.move_iter()),
+                Ok(w) => ret.words.extend(w.into_iter()),
                 Err(e) => {
                     ret.loading_error = Some(format!("error loading `{}`: {}", p.display(), e));
                     return ret
