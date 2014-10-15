@@ -1,5 +1,5 @@
 #![crate_name = "spellck"]
-#![feature(phase, plugin_registrar)]
+#![feature(phase, plugin_registrar, if_let)]
 
 
 extern crate syntax;
