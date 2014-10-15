@@ -16,7 +16,7 @@ line. `src/stdlib.txt` is the words/abbreviations/sequences of letters
 from the Rust standard library that are correct, but are not in my
 `/usr/share/dict/words`.
 
-Known to work with Rust commit 85fd37f87 2014-08-16.
+Known to work with Rust commit 40b244973 2014-10-14 23:22:20.
 
 
 ## Installation

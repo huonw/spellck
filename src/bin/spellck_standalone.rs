@@ -1,6 +1,5 @@
 #![crate_name = "spellck_standalone"]
 #![deny(missing_doc)]
-#![feature(managed_boxes)]
 
 //! Prints the misspelled words in the public documentation &
 //! identifiers of a crate.
