@@ -8,6 +8,7 @@ extern crate getopts;
 extern crate arena;
 extern crate syntax;
 extern crate rustc;
+extern crate rustc_trans;
 
 extern crate spellck;
 
@@ -16,8 +17,9 @@ use std::collections::{HashSet, BinaryHeap};
 use arena::TypedArena;
 use syntax::{ast, ast_map};
 use syntax::codemap::{Span, BytePos};
-use rustc::driver::{driver, session, config};
 use rustc::middle::privacy;
+use rustc::session::{mod, config};
+use rustc_trans::driver::driver;
 
 use spellck::visitor::SpellingVisitor;
 
@@ -26,7 +28,7 @@ static LIBDIR: &'static str = "/usr/local/lib/rustlib/x86_64-unknown-linux-gnu/l
 
 fn main() {
     let args = os::args();
-    let opts = [getopts::optmulti("d", "dict",
+    let opts = &[getopts::optmulti("d", "dict",
                                   "dictionary file (a list of words, one per line)", "PATH"),
                 getopts::optflag("n", "no-def-dict", "don't use the default dictionary"),
                 getopts::optflag("h", "help", "show this help message")];
@@ -122,7 +124,7 @@ fn main() {
     }
 }
 
-/// Load each line of the file `p` into the given `Extendable` object.
+/// Load each line of the file `p` into the given `Extend` object.
 fn read_lines_into<E: Extend<String>>
                   (p: &Path, e: &mut E) -> bool {
     match io::File::open(p) {
@@ -149,7 +151,7 @@ fn get_ast<T>(path: Path,
               f: |session::Session, &ast::Crate,
                   privacy::ExportedItems, privacy::PublicItems| -> T) -> T {
     use syntax::diagnostic;
-    use rustc::back::link;
+    use rustc_trans::back::link;
 
     // cargo culted from rustdoc_ng :(
     let input = driver::FileInput(path);
