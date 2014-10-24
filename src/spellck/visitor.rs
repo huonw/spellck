@@ -77,7 +77,8 @@ impl<'a> SpellingVisitor<'a> {
     fn raw_word_is_correct(&mut self, w: &str) -> bool {
         self.words.contains_equiv(&w) ||
             !w.chars().all(|c| c.is_alphabetic()) ||
-            self.words.contains_equiv(&w.to_ascii_lower())
+            self.words.contains_equiv(&w.to_ascii_lower()) ||
+            (w.ends_with("s") && self.words.contains_equiv(&w.to_ascii_lower()[.. w.len() - 1]))
     }
 
     /// Check a word for correctness, including splitting `foo_bar`
