@@ -13,3 +13,6 @@ plugin = true
 [[bin]]
 
 name = "spellck_standalone"
+
+[dependencies.stem]
+git = "https://github.com/mrordinaire/rust-stem"
