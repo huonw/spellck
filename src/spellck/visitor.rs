@@ -84,8 +84,8 @@ impl<'a> SpellingVisitor<'a> {
                 Ok(s) => {
                     self.words.contains_equiv(&s.as_slice().to_ascii_lower())
                 }
-                Err(e) => {
-                    fail!("could not stem word. {}", e)
+                Err(_e) => {
+                    false
                 }
             }}
     }
