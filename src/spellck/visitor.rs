@@ -84,14 +84,8 @@ impl<'a> SpellingVisitor<'a> {
     }
 
     fn stemmed_word_is_correct(&self, w: &str) -> bool {
-        match stem::get(w) {
-                Ok(s) => {
-                    self.words.contains_equiv(&s.as_slice().to_ascii_lower())
-                }
-                Err(_e) => {
-                    false
-                }
-            }
+        stem::get(w).ok().map_or(false,
+            |s| self.words.contains_equiv(&s.as_slice().to_ascii_lower()))
     }
 
     /// Check a word for correctness, including splitting `foo_bar`
