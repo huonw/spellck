@@ -11,11 +11,13 @@ use syntax::ast_util::PostExpansionMethod;
 use rustc::middle::privacy::ExportedItems;
 
 use words;
+use stem;
 
 pub struct Position {
     pub span: Span,
     pub id: NodeId,
 }
+
 impl Position {
     fn new(sp: Span, id: NodeId) -> Position {
         Position { span: sp, id: id, }
@@ -75,9 +77,17 @@ impl<'a> SpellingVisitor<'a> {
     /// splitting it at all. Any word that isn't entirely alphabetic
     /// is automatically considered a proper word.
     fn raw_word_is_correct(&mut self, w: &str) -> bool {
-        self.words.contains_equiv(&w) ||
-            !w.chars().all(|c| c.is_alphabetic()) ||
-            self.words.contains_equiv(&w.to_ascii_lower())
+        self.words.contains_equiv(w.as_slice()) ||
+            !w.chars().all(|c| c.is_alphabetic()) || {
+                let lower = w.to_ascii_lower();
+                self.words.contains_equiv(lower.as_slice()) ||
+                self.stemmed_word_is_correct(lower.as_slice())
+            }
+    }
+
+    fn stemmed_word_is_correct(&self, w: &str) -> bool {
+        stem::get(w).ok().map_or(false,
+            |s| self.words.contains_equiv(s.as_slice()))
     }
 
     /// Check a word for correctness, including splitting `foo_bar`

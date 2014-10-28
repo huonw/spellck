@@ -5,6 +5,8 @@
 extern crate syntax;
 #[phase(plugin, link)] extern crate rustc;
 
+extern crate stem;
+
 use rustc::plugin::Registry;
 
 pub mod words;
