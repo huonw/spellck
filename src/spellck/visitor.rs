@@ -1,5 +1,5 @@
 use std::collections::{TreeMap, HashSet};
-use std::ascii::StrAsciiExt;
+use std::ascii::AsciiExt;
 
 use syntax::{ast, visit};
 use syntax::parse::token;
