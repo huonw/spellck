@@ -98,7 +98,7 @@ impl<'a> SpellingVisitor<'a> {
         for w in words::subwords(w) {
             if !self.raw_word_is_correct(w) {
                 let w = w.to_string();
-                match self.misspellings.find_mut(&pos) {
+                match self.misspellings.get_mut(&pos) {
                     Some(v) => {
                         v.push(w);
                         continue
@@ -263,8 +263,9 @@ impl<'a, 'v> visit::Visitor<'v> for SpellingVisitor<'a> {
                 self.check_ident(method.pe_ident(), Position::new(method.span, method.id));
             }
             ast::TypeTraitItem(ref item) => {
-                self.check_doc_attrs(item.attrs.as_slice(), item.id);
-                self.check_ident(item.ident, Position::new(item.span, item.id));
+                let ast::AssociatedType { ref attrs, ref ty_param } = **item;
+                self.check_doc_attrs(attrs.as_slice(), ty_param.id);
+                self.check_ident(ty_param.ident, Position::new(ty_param.span, ty_param.id));
             }
         }
     }

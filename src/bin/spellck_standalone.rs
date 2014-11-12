@@ -12,7 +12,7 @@ extern crate rustc;
 extern crate spellck;
 
 use std::{io, os};
-use std::collections::{HashSet, PriorityQueue};
+use std::collections::{HashSet, BinaryHeap};
 use arena::TypedArena;
 use syntax::{ast, ast_map};
 use syntax::codemap::{Span, BytePos};
@@ -86,7 +86,7 @@ fn main() {
 
             // extract the lines in order of the spans, so that e.g. files
             // are grouped together, and lines occur in increasing order.
-            let pq: PriorityQueue<Sort> =
+            let pq: BinaryHeap<Sort> =
                 visitor.misspellings.iter().map(|(pos, v)| Sort { sp: pos.span, words: v }).collect();
 
             // run through the spans, printing the words that are
@@ -123,7 +123,7 @@ fn main() {
 }
 
 /// Load each line of the file `p` into the given `Extendable` object.
-fn read_lines_into<E: Extendable<String>>
+fn read_lines_into<E: Extend<String>>
                   (p: &Path, e: &mut E) -> bool {
     match io::File::open(p) {
         Ok(mut r) => {
