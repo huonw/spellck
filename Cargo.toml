@@ -4,6 +4,15 @@ name = "spellck"
 version = "0.2.0"
 authors = [ "Huon Wilson <dbau.pp@gmail.com>" ]
 
+homepage = "https://github.com/huonw/spellck"
+repository = "https://github.com/huonw/spellck"
+license = "MIT/Apache-2.0"
+keywords = ["plugin", "lint"]
+readme = "README.md"
+description = """
+A plugin lint for detecting misspelt words in documentation and APIs.
+"""
+
 [lib]
 
 name = "spellck"
