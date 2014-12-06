@@ -110,7 +110,7 @@ fn main() {
                 // first line; no lines = no printing
                 match lines.lines.as_slice() {
                     [line_num, ..] => {
-                        let line = lines.file.get_line(line_num as int);
+                        let line = lines.file.get_line(line_num);
                         println!("{}: {}", sp_text, line);
                     }
                     _ => {}
@@ -135,7 +135,8 @@ fn read_lines_into<E: Extend<String>>
             true
         }
         Err(e) => {
-            (write!(&mut io::stderr() as &mut Writer,
+            let mut stderr = io::stderr();
+            (write!(&mut stderr as &mut Writer,
                     "Error reading {}: {}", p.display(), e)).unwrap();
             os::set_exit_status(10);
             false

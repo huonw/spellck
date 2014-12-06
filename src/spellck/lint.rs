@@ -39,7 +39,7 @@ impl Misspellings {
             let words = File::open(&p)
                 .and_then(|f| {
                     let mut rdr = BufferedReader::new(f);
-                    let mut lines = rdr.lines().map(|l| l.map(|s| s.as_slice().trim().to_string()));
+                    let lines = rdr.lines().map(|l| l.map(|s| s.as_slice().trim().to_string()));
                     lines.collect::<Result<Vec<String>, _>>()
                 });
 
