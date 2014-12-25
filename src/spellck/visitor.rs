@@ -1,4 +1,4 @@
-use std::collections::{TreeMap, HashSet};
+use std::collections::{BTreeMap, HashSet};
 use std::ascii::AsciiExt;
 
 use syntax::{ast, visit};
@@ -13,6 +13,7 @@ use rustc::middle::privacy::ExportedItems;
 use words;
 use stem;
 
+#[deriving(Copy)]
 pub struct Position {
     pub span: Span,
     pub id: NodeId,
@@ -54,7 +55,7 @@ pub struct SpellingVisitor<'a> {
     exported: &'a ExportedItems,
 
     /// The misspelled words
-    pub misspellings: TreeMap<Position, Vec<String>>,
+    pub misspellings: BTreeMap<Position, Vec<String>>,
 
     /// Whether the traversal should only check documentation, not
     /// idents; gets controlled internally, e.g. for `extern` blocks.
@@ -63,12 +64,12 @@ pub struct SpellingVisitor<'a> {
 
 impl<'a> SpellingVisitor<'a> {
     /// ast::Create a new Spelling Visitor.
-    pub fn new<'a>(words: &'a HashSet<String>,
-                   exported: &'a ExportedItems) -> SpellingVisitor<'a> {
+    pub fn new<'b>(words: &'b HashSet<String>,
+                   exported: &'b ExportedItems) -> SpellingVisitor<'b> {
         SpellingVisitor {
             words: words,
             exported: exported,
-            misspellings: TreeMap::new(),
+            misspellings: BTreeMap::new(),
             doc_only: false
         }
     }
@@ -213,7 +214,7 @@ impl<'a, 'v> visit::Visitor<'v> for SpellingVisitor<'a> {
                 visit::walk_item(self, item)
             }
             // impl Type { ... }
-            ast::ItemImpl(_, None, _, ref items) => {
+            ast::ItemImpl(_, _, None, _, ref items) => {
                 for item in items.iter() {
                     match *item {
                         ast::MethodImplItem(ref method) => {
@@ -235,7 +236,7 @@ impl<'a, 'v> visit::Visitor<'v> for SpellingVisitor<'a> {
             }
             // impl Trait for Type { ... }, only check the docs, the
             // method names come from elsewhere.
-            ast::ItemImpl(_, Some(..), _, _) => {
+            ast::ItemImpl(_, _, Some(..), _, _) => {
                 let old_d_o = self.doc_only;
                 self.doc_only = true;
                 visit::walk_item(self, item);

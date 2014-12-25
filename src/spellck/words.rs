@@ -5,7 +5,7 @@ use std::str;
 /// Struct for the `subwords` iterator.
 pub struct SubwordIter<'a> {
     s: &'a str,
-    iter: str::CharOffsets<'a>,
+    iter: str::CharIndices<'a>,
     word_start: Option<uint>,
 }
 

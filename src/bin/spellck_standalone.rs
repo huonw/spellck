@@ -8,6 +8,7 @@ extern crate getopts;
 extern crate arena;
 extern crate syntax;
 extern crate rustc;
+extern crate rustc_driver;
 extern crate rustc_trans;
 
 extern crate spellck;
@@ -17,9 +18,9 @@ use std::collections::{HashSet, BinaryHeap};
 use arena::TypedArena;
 use syntax::{ast, ast_map};
 use syntax::codemap::{Span, BytePos};
-use rustc::middle::privacy;
+use rustc::middle::{privacy, ty};
 use rustc::session::{mod, config};
-use rustc_trans::driver::driver;
+use rustc_driver::driver;
 
 use spellck::visitor::SpellingVisitor;
 
@@ -155,7 +156,7 @@ fn get_ast<T>(path: Path,
     use rustc_trans::back::link;
 
     // cargo culted from rustdoc_ng :(
-    let input = driver::FileInput(path);
+    let input = config::Input::File(path);
 
     let sessopts = config::Options {
         maybe_sysroot: Some(os::self_exe_path().unwrap().dir_path()),
@@ -183,7 +184,7 @@ fn get_ast<T>(path: Path,
     let ast_map = driver::assign_node_ids_and_map(&sess, &mut forest);
     let type_arena = TypedArena::new();
     let res = driver::phase_3_run_analysis_passes(sess, ast_map, &type_arena, id);
-    let driver::CrateAnalysis {
+    let ty::CrateAnalysis {
         exported_items, public_items, ty_cx, .. } = res;
     f(ty_cx.sess, ty_cx.map.krate(), exported_items, public_items)
 }
