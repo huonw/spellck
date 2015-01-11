@@ -95,18 +95,20 @@ impl<'a> SpellingVisitor<'a> {
     /// and `FooBar` into `foo` & `bar` and `Foo` & `Bar`
     /// respectively. This inserts any incorrect word(s) into the
     /// misspelling map.
-    fn check_subwords(&mut self, w: &str, pos: Position) {
-        for w in words::subwords(w) {
+    fn check_subwords(&mut self, whole: &str, mut pos: Position) {
+        for w in words::subwords(whole) {
             if !self.raw_word_is_correct(w) {
-                let w = w.to_string();
-                match self.misspellings.get_mut(&pos) {
-                    Some(v) => {
-                        v.push(w);
-                        continue
-                    }
-                    None => {}
+                let ws = w.into_string();
+                let amt = whole.subslice_offset(w);
+                pos.span.lo = pos.span.lo + BytePos(amt as u32);
+                pos.span.hi = pos.span.lo + BytePos(w.len() as u32);
+
+                if let Some(v) = self.misspellings.get_mut(&pos) {
+                    v.push(ws);
+                    continue
                 }
-                self.misspellings.insert(pos, vec![w]);
+
+                self.misspellings.insert(pos, vec![ws]);
             }
         }
     }
