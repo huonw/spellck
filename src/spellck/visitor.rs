@@ -1,5 +1,6 @@
 use std::collections::{BTreeMap, HashSet};
 use std::ascii::AsciiExt;
+use std::cmp::Ordering;
 
 use syntax::{ast, visit};
 use syntax::parse::token;
@@ -13,7 +14,7 @@ use rustc::middle::privacy::ExportedItems;
 use words;
 use stem;
 
-#[deriving(Copy)]
+#[derive(Copy)]
 pub struct Position {
     pub span: Span,
     pub id: NodeId,
@@ -27,7 +28,7 @@ impl Position {
 
 impl PartialEq for Position {
     fn eq(&self, other: &Position) -> bool {
-        self.cmp(other) == Equal
+        self.cmp(other) == Ordering::Equal
     }
 }
 impl Eq for Position {}
@@ -80,7 +81,7 @@ impl<'a> SpellingVisitor<'a> {
     fn raw_word_is_correct(&mut self, w: &str) -> bool {
         self.words.contains(w.as_slice()) ||
             !w.chars().all(|c| c.is_alphabetic()) || {
-                let lower = w.to_ascii_lower();
+                let lower = w.to_ascii_lowercase();
                 self.words.contains(lower.as_slice()) ||
                 self.stemmed_word_is_correct(lower.as_slice())
             }
@@ -156,25 +157,6 @@ impl<'a> SpellingVisitor<'a> {
 // e.g. documentation, pub fns, pub mods etc and checks their
 // spelling.
 impl<'a, 'v> visit::Visitor<'v> for SpellingVisitor<'a> {
-    fn visit_view_item(&mut self, view_item: &ast::ViewItem) {
-        // only check the ident for `use self = foo;`; since there's
-        // nothing else the user can do to control the name.
-        if view_item.vis == ast::Public {
-            // FIXME #6: no node ids
-            // self.check_doc_attrs(view_item.attrs.as_slice());
-            match view_item.node {
-                ast::ViewItemUse(ref vp) => {
-                    match vp.node {
-                        ast::ViewPathSimple(_ident, _, _) => {
-                            // self.check_ident(id, vp.span);
-                        }
-                        _ => {}
-                    }
-                }
-                ast::ViewItemExternCrate(..) => {}
-            }
-        }
-    }
     fn visit_foreign_item(&mut self, foreign_item: &ast::ForeignItem) {
         if self.exported.contains(&foreign_item.id) {
             // don't check the ident; there's nothing the user can do to
@@ -214,7 +196,7 @@ impl<'a, 'v> visit::Visitor<'v> for SpellingVisitor<'a> {
                 visit::walk_item(self, item)
             }
             // impl Type { ... }
-            ast::ItemImpl(_, _, None, _, ref items) => {
+            ast::ItemImpl(_, _, _, None, _, ref items) => {
                 for item in items.iter() {
                     match *item {
                         ast::MethodImplItem(ref method) => {
@@ -236,7 +218,7 @@ impl<'a, 'v> visit::Visitor<'v> for SpellingVisitor<'a> {
             }
             // impl Trait for Type { ... }, only check the docs, the
             // method names come from elsewhere.
-            ast::ItemImpl(_, _, Some(..), _, _) => {
+            ast::ItemImpl(_, _, _, Some(..), _, _) => {
                 let old_d_o = self.doc_only;
                 self.doc_only = true;
                 visit::walk_item(self, item);

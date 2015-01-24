@@ -14,12 +14,15 @@ extern crate rustc_trans;
 extern crate spellck;
 
 use std::{io, os};
-use std::collections::{HashSet, BinaryHeap};
+use std::cell::Cell;
+use std::cmp::Ordering;
+use std::collections::{HashMap, HashSet, BinaryHeap};
 use arena::TypedArena;
 use syntax::{ast, ast_map};
 use syntax::codemap::{Span, BytePos};
 use rustc::middle::{privacy, ty};
-use rustc::session::{mod, config};
+use rustc::session::search_paths::SearchPaths;
+use rustc::session::{self, config};
 use rustc_driver::driver;
 
 use spellck::visitor::SpellingVisitor;
@@ -53,15 +56,20 @@ fn main() {
         }
     }
 
+    let mut search_paths = SearchPaths::new();
+    search_paths.add_path(LIBDIR);
+    let externs = HashMap::new();
+
     // one visitor; the internal list of misspelled words gets reset
     // for each file, since the spans could conflict.
-    let mut any_mistakes = false;
+    let mut any_mistakes = Cell::new(false);
 
     for name in matches.free.iter() {
-        get_ast(Path::new(name.as_slice()), |sess, krate, export, _public| {
+        get_ast(Path::new(name.as_slice()), search_paths.clone(), externs.clone(),
+                |sess, krate, export, _public| {
             let cm = sess.codemap();
 
-            let mut visitor = SpellingVisitor::new(&words, &export);
+            let mut visitor = SpellingVisitor::new(&words, export);
             visitor.check_crate(krate);
 
             struct Sort<'a> {
@@ -95,7 +103,7 @@ fn main() {
             // run through the spans, printing the words that are
             // apparently misspelled
             for Sort {sp, words} in pq.into_sorted_vec().into_iter() {
-                any_mistakes = true;
+                any_mistakes.set(true);
 
                 let lines = cm.span_to_lines(sp);
                 let sp_text = cm.span_to_string(sp);
@@ -111,8 +119,9 @@ fn main() {
                 // first line; no lines = no printing
                 match lines.lines.as_slice() {
                     [line_num, ..] => {
-                        let line = lines.file.get_line(line_num);
-                        println!("{}: {}", sp_text, line);
+                        if let Some(line) = lines.file.get_line(line_num) {
+                            println!("{}: {}", sp_text, line);
+                        }
                     }
                     _ => {}
                 }
@@ -120,7 +129,7 @@ fn main() {
         })
     }
 
-    if any_mistakes {
+    if any_mistakes.get() {
         os::set_exit_status(1)
     }
 }
@@ -145,13 +154,17 @@ fn read_lines_into<E: Extend<String>>
     }
 }
 
+type Externs = HashMap<String, Vec<String>>;
+
 /// Extract the expanded ast of a crate, along with the codemap which
 /// connects source code locations to the actual code.
 /// Extract the expanded ast of a krate, along with the codemap which
 /// connects source code locations to the actual code.
-fn get_ast<T>(path: Path,
-              f: |session::Session, &ast::Crate,
-                  privacy::ExportedItems, privacy::PublicItems| -> T) -> T {
+fn get_ast<F>(path: Path,
+              search_paths: SearchPaths, externs: Externs,
+              f: F)
+        where F: Fn(&session::Session, &ast::Crate,
+                    &privacy::ExportedItems, &privacy::PublicItems) {
     use syntax::diagnostic;
     use rustc_trans::back::link;
 
@@ -160,8 +173,8 @@ fn get_ast<T>(path: Path,
 
     let sessopts = config::Options {
         maybe_sysroot: Some(os::self_exe_path().unwrap().dir_path()),
-        addl_lib_search_paths: std::cell::RefCell::new(
-            Some(Path::new(LIBDIR)).into_iter().collect()),
+        externs: externs,
+        search_paths: search_paths,
         .. config::basic_options().clone()
     };
 
@@ -175,16 +188,16 @@ fn get_ast<T>(path: Path,
 
     let cfg = config::build_configuration(&sess);
 
-    let krate = driver::phase_1_parse_input(&sess, cfg, &input);
-    let id = link::find_crate_name(Some(&sess), krate.attrs.as_slice(),
-                                   &input);
-    let krate = driver::phase_2_configure_and_expand(
-        &sess, krate, id.as_slice(), None).unwrap();
-    let mut forest = ast_map::Forest::new(krate);
-    let ast_map = driver::assign_node_ids_and_map(&sess, &mut forest);
-    let type_arena = TypedArena::new();
-    let res = driver::phase_3_run_analysis_passes(sess, ast_map, &type_arena, id);
-    let ty::CrateAnalysis {
-        exported_items, public_items, ty_cx, .. } = res;
-    f(ty_cx.sess, ty_cx.map.krate(), exported_items, public_items)
+
+    let mut controller = driver::CompileController::basic();
+    controller.after_analysis = driver::PhaseController {
+        stop: true,
+        callback: Box::new(|state| {
+            let ca = state.analysis.unwrap();
+            let ty::CrateAnalysis { ref exported_items, ref public_items, ref ty_cx, .. } = *ca;
+            f(&ty_cx.sess, ty_cx.map.krate(), exported_items, public_items)
+        })
+    };
+
+    driver::compile_input(sess, cfg, &input, &None, &None, None, controller);
 }

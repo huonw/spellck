@@ -6,7 +6,7 @@ use std::str;
 pub struct SubwordIter<'a> {
     s: &'a str,
     iter: str::CharIndices<'a>,
-    word_start: Option<uint>,
+    word_start: Option<usize>,
 }
 
 /// Iterate over the "subwords" of a string, e.g. `Foobar` -> `Foo`,
@@ -20,7 +20,8 @@ pub fn subwords<'a>(s: &'a str) -> SubwordIter<'a> {
     }
 }
 
-impl<'a> Iterator<&'a str> for SubwordIter<'a> {
+impl<'a> Iterator for SubwordIter<'a> {
+    type Item = &'a str;
     fn next(&mut self) -> Option<&'a str> {
         let mut word_start = self.word_start;
         for (offset, c) in self.iter {
