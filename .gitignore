@@ -1,6 +1,0 @@
-doc/
-target/
-*.rlib
-*.so
-*.dylib
-Cargo.lock
