@@ -40,7 +40,7 @@ impl Misspellings {
             let words = File::open(&p)
                 .and_then(|f| {
                     let mut rdr = BufferedReader::new(f);
-                    let lines = rdr.lines().map(|l| l.map(|s| s.as_slice().trim().to_string()));
+                    let lines = rdr.lines().map(|l| l.map(|s| s.trim().to_string()));
                     lines.collect::<Result<Vec<String>, _>>()
                 });
 
@@ -67,7 +67,7 @@ impl LintPass for Misspellings {
         match self.loading_error {
             None => {}
             Some(ref e) => {
-                sess.err(format!("failed to start misspelling lint: {}", *e).as_slice());
+                sess.err(&format!("failed to start misspelling lint: {}", *e)[]);
                 return
             }
         }

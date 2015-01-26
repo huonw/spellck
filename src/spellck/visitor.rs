@@ -79,17 +79,16 @@ impl<'a> SpellingVisitor<'a> {
     /// splitting it at all. Any word that isn't entirely alphabetic
     /// is automatically considered a proper word.
     fn raw_word_is_correct(&mut self, w: &str) -> bool {
-        self.words.contains(w.as_slice()) ||
+        self.words.contains(w) ||
             !w.chars().all(|c| c.is_alphabetic()) || {
                 let lower = w.to_ascii_lowercase();
-                self.words.contains(lower.as_slice()) ||
-                self.stemmed_word_is_correct(lower.as_slice())
+                self.words.contains(&lower) ||
+                self.stemmed_word_is_correct(&lower[])
             }
     }
 
     fn stemmed_word_is_correct(&self, w: &str) -> bool {
-        stem::get(w).ok().map_or(false,
-            |s| self.words.contains(s.as_slice()))
+        stem::get(w).ok().map_or(false, |s| self.words.contains(&s[]))
     }
 
     /// Check a word for correctness, including splitting `foo_bar`
@@ -100,14 +99,7 @@ impl<'a> SpellingVisitor<'a> {
         for w in words::subwords(w) {
             if !self.raw_word_is_correct(w) {
                 let w = w.to_string();
-                match self.misspellings.get_mut(&pos) {
-                    Some(v) => {
-                        v.push(w);
-                        continue
-                    }
-                    None => {}
-                }
-                self.misspellings.insert(pos, vec![w]);
+                self.misspellings.entry(pos).get().unwrap_or_else(|v| v.insert(vec![])).push(w);
             }
         }
     }
@@ -148,7 +140,7 @@ impl<'a> SpellingVisitor<'a> {
 
     /// Spell-check a whole krate.
     pub fn check_crate(&mut self, krate: &ast::Crate) {
-        self.check_doc_attrs(krate.attrs.as_slice(), ast::CRATE_NODE_ID);
+        self.check_doc_attrs(&krate.attrs[], ast::CRATE_NODE_ID);
         visit::walk_crate(self, krate)
     }
 }
@@ -161,7 +153,7 @@ impl<'a, 'v> visit::Visitor<'v> for SpellingVisitor<'a> {
         if self.exported.contains(&foreign_item.id) {
             // don't check the ident; there's nothing the user can do to
             // control the name.
-            self.check_doc_attrs(foreign_item.attrs.as_slice(), foreign_item.id);
+            self.check_doc_attrs(&foreign_item.attrs[], foreign_item.id);
         }
     }
 
@@ -177,7 +169,7 @@ impl<'a, 'v> visit::Visitor<'v> for SpellingVisitor<'a> {
             self.check_ident(item.ident, Position::new(item.span, item.id));
         }
         if is_exported {
-            self.check_doc_attrs(item.attrs.as_slice(), item.id);
+            self.check_doc_attrs(&item.attrs[], item.id);
         }
 
         match item.node {
@@ -188,7 +180,7 @@ impl<'a, 'v> visit::Visitor<'v> for SpellingVisitor<'a> {
                 for var in ed.variants.iter() {
                     if self.exported.contains(&var.node.id) {
                         self.check_ident(var.node.name, Position::new(var.span, var.node.id));
-                        self.check_doc_attrs(var.node.attrs.as_slice(), var.node.id);
+                        self.check_doc_attrs(&var.node.attrs[], var.node.id);
                     }
                 }
             }
@@ -203,14 +195,14 @@ impl<'a, 'v> visit::Visitor<'v> for SpellingVisitor<'a> {
                             if self.exported.contains(&method.id) {
                                 self.check_ident(method.pe_ident(),
                                                  Position::new(method.span, method.id));
-                                self.check_doc_attrs(method.attrs.as_slice(), method.id);
+                                self.check_doc_attrs(&method.attrs[], method.id);
                             }
                         }
                         ast::TypeImplItem(ref item) => {
                             if self.exported.contains(&item.id) {
                                 self.check_ident(item.ident,
                                                  Position::new(item.span, item.id));
-                                self.check_doc_attrs(item.attrs.as_slice(), item.id);
+                                self.check_doc_attrs(&item.attrs[], item.id);
                             }
                         }
                     }
@@ -232,7 +224,7 @@ impl<'a, 'v> visit::Visitor<'v> for SpellingVisitor<'a> {
     }
 
     fn visit_ty_method(&mut self, method_type: &ast::TypeMethod) {
-        self.check_doc_attrs(method_type.attrs.as_slice(), method_type.id);
+        self.check_doc_attrs(&method_type.attrs[], method_type.id);
         self.check_ident(method_type.ident, Position::new(method_type.span, method_type.id));
         visit::walk_ty_method(self, method_type)
     }
@@ -242,12 +234,12 @@ impl<'a, 'v> visit::Visitor<'v> for SpellingVisitor<'a> {
                 visit::walk_trait_item(self, trait_item)
             }
             ast::ProvidedMethod(ref method) => {
-                self.check_doc_attrs(method.attrs.as_slice(), method.id);
+                self.check_doc_attrs(&method.attrs[], method.id);
                 self.check_ident(method.pe_ident(), Position::new(method.span, method.id));
             }
             ast::TypeTraitItem(ref item) => {
                 let ast::AssociatedType { ref attrs, ref ty_param } = **item;
-                self.check_doc_attrs(attrs.as_slice(), ty_param.id);
+                self.check_doc_attrs(&attrs[], ty_param.id);
                 self.check_ident(ty_param.ident, Position::new(ty_param.span, ty_param.id));
             }
         }
@@ -268,7 +260,7 @@ impl<'a, 'v> visit::Visitor<'v> for SpellingVisitor<'a> {
                     ast::Public => {
                         self.check_ident(ident,
                                          Position::new(struct_field.span, struct_field.node.id));
-                        self.check_doc_attrs(struct_field.node.attrs.as_slice(),
+                        self.check_doc_attrs(&struct_field.node.attrs[],
                                              struct_field.node.id);
                     }
                     ast::Inherited => {}

@@ -38,12 +38,12 @@ impl<'a> Iterator for SubwordIter<'a> {
                         None
                     };
 
-                    return Some(self.s.slice(ws, offset))
+                    return Some(&self.s[ws..offset])
                 }
                 Some(_) => {}
             }
         }
-        word_start.map(|ws| { self.word_start = None; self.s.slice_from(ws) })
+        word_start.map(|ws| { self.word_start = None; &self.s[ws..] })
     }
 }
 

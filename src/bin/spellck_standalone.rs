@@ -62,10 +62,10 @@ fn main() {
 
     // one visitor; the internal list of misspelled words gets reset
     // for each file, since the spans could conflict.
-    let mut any_mistakes = Cell::new(false);
+    let any_mistakes = Cell::new(false);
 
     for name in matches.free.iter() {
-        get_ast(Path::new(name.as_slice()), search_paths.clone(), externs.clone(),
+        get_ast(Path::new(name), search_paths.clone(), externs.clone(),
                 |sess, krate, export, _public| {
             let cm = sess.codemap();
 
@@ -109,7 +109,7 @@ fn main() {
                 let sp_text = cm.span_to_string(sp);
 
                 // [] required for connect :(
-                let word_vec: Vec<&str> = words.iter().map(|s| s.as_slice()).collect();
+                let word_vec: Vec<&str> = words.iter().map(|s| &s[]).collect();
 
                 println!("{}: misspelled {words}: {}",
                          sp_text,
@@ -117,7 +117,7 @@ fn main() {
                          words = if words.len() == 1 {"word"} else {"words"});
 
                 // first line; no lines = no printing
-                match lines.lines.as_slice() {
+                match &lines.lines[] {
                     [line_num, ..] => {
                         if let Some(line) = lines.file.get_line(line_num) {
                             println!("{}: {}", sp_text, line);
@@ -140,8 +140,8 @@ fn read_lines_into<E: Extend<String>>
     match io::File::open(p) {
         Ok(mut r) => {
             let s = String::from_utf8(r.read_to_end().unwrap())
-                .ok().expect(format!("{} is not UTF-8", p.display()).as_slice());
-            e.extend(s.as_slice().lines().map(|ss| ss.to_string()));
+                .ok().expect(&format!("{} is not UTF-8", p.display())[]);
+            e.extend(s.lines().map(|ss| ss.to_string()));
             true
         }
         Err(e) => {
