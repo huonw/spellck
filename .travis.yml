@@ -1,10 +1,2 @@
-language: rust
-sudo: false
-script:
-- cargo build --verbose && cargo test --verbose
-- cargo doc --verbose
-after_success:
-- test "$TRAVIS_PULL_REQUEST" == false && test "$TRAVIS_BRANCH" == "master" && bash deploy-docs.sh
-env:
-  global:
-    secure: fcLpQS5vhp6yLmno8IZMatavq03+CuS17Ec4b2Mqjz/pdeg//HTdjGV02VJP2/vzOHz11kMGdUdETWYvps06G3T9hypGWqCLliehzlkrG57gYKLnky89rILetCKzdS63h9VD8LU9dxoZdfcHZpfG/IM7CCKOyaZ4scGtEAs5N14=
+notifications:
+    webhooks: http://huon.me:54856/travis
