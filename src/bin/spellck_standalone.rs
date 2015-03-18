@@ -1,6 +1,7 @@
 #![crate_name = "spellck_standalone"]
 #![deny(missing_docs)]
-#![feature(os, io, rustc_private)]
+#![feature(rustc_private)]
+#![feature(collections, exit_status, std_misc)]
 
 //! Prints the misspelled words in the public documentation &
 //! identifiers of a crate.
@@ -12,20 +13,23 @@ extern crate rustc;
 extern crate rustc_driver;
 extern crate rustc_trans;
 
+#[allow(plugin_as_library)]
 extern crate spellck;
 
-use std::os;
-use std::old_io as io;
+use std::env;
+use std::path::{AsPath, PathBuf};
+use std::fs::File;
+use std::io;
+use std::io::prelude::*;
 use std::cell::Cell;
 use std::cmp::Ordering;
 use std::collections::{HashMap, HashSet, BinaryHeap};
-use arena::TypedArena;
-use syntax::{ast, ast_map};
+use syntax::ast;
 use syntax::codemap::{Span, BytePos};
+use syntax::diagnostics;
 use rustc::middle::{privacy, ty};
-use rustc::session::search_paths::SearchPaths;
 use rustc::session::{self, config};
-use rustc_driver::driver;
+use rustc_driver::{driver, pretty, Compilation};
 
 use spellck::visitor::SpellingVisitor;
 
@@ -33,7 +37,7 @@ static DEFAULT_DICT: &'static str = "/usr/share/dict/words";
 static LIBDIR: &'static str = "/usr/local/lib/rustlib/x86_64-unknown-linux-gnu/lib";
 
 fn main() {
-    let args = os::args();
+    let args = env::args().collect::<Vec<_>>();
     let opts = &[getopts::optmulti("d", "dict",
                                   "dictionary file (a list of words, one per line)", "PATH"),
                 getopts::optflag("n", "no-def-dict", "don't use the default dictionary"),
@@ -41,33 +45,29 @@ fn main() {
 
     let matches = getopts::getopts(args.tail(), opts).unwrap();
     if matches.opt_present("help") {
-        println!("{}", getopts::usage(args[0].as_slice(), opts));
+        println!("{}", getopts::usage(&args[0], opts));
         return;
     }
 
     let mut words = HashSet::new();
 
     if !matches.opt_present("no-def-dict") {
-        if !read_lines_into(&Path::new(DEFAULT_DICT), &mut words) {
+        if !read_lines_into(DEFAULT_DICT, &mut words) {
             return
         }
     }
     for dict in matches.opt_strs("d").into_iter().chain(matches.opt_strs("dict").into_iter()) {
-        if !read_lines_into(&Path::new(dict), &mut words) {
+        if !read_lines_into(&dict, &mut words) {
             return
         }
     }
-
-    let mut search_paths = SearchPaths::new();
-    search_paths.add_path(LIBDIR);
-    let externs = HashMap::new();
 
     // one visitor; the internal list of misspelled words gets reset
     // for each file, since the spans could conflict.
     let any_mistakes = Cell::new(false);
 
-    for name in matches.free.iter() {
-        get_ast(Path::new(name), search_paths.clone(), externs.clone(),
+    for name in matches.free {
+        get_ast(name,
                 |sess, krate, export, _public| {
             let cm = sess.codemap();
 
@@ -111,7 +111,7 @@ fn main() {
                 let sp_text = cm.span_to_string(sp);
 
                 // [] required for connect :(
-                let word_vec: Vec<&str> = words.iter().map(|s| &s[]).collect();
+                let word_vec: Vec<&str> = words.iter().map(|s| &**s).collect();
 
                 println!("{}: misspelled {words}: {}",
                          sp_text,
@@ -119,7 +119,7 @@ fn main() {
                          words = if words.len() == 1 {"word"} else {"words"});
 
                 // first line; no lines = no printing
-                match &lines.lines[] {
+                match &*lines.lines {
                     [line_num, ..] => {
                         if let Some(line) = lines.file.get_line(line_num) {
                             println!("{}: {}", sp_text, line);
@@ -132,25 +132,25 @@ fn main() {
     }
 
     if any_mistakes.get() {
-        os::set_exit_status(1)
+        env::set_exit_status(1)
     }
 }
 
 /// Load each line of the file `p` into the given `Extend` object.
-fn read_lines_into<E: Extend<String>>
-                  (p: &Path, e: &mut E) -> bool {
-    match io::File::open(p) {
+fn read_lines_into<P: AsPath + ::std::fmt::Debug + ?Sized, E: Extend<String>>
+                  (p: &P, e: &mut E) -> bool {
+    match File::open(p) {
         Ok(mut r) => {
-            let s = String::from_utf8(r.read_to_end().unwrap())
-                .ok().expect(&format!("{} is not UTF-8", p.display())[]);
+            let mut s = String::new();
+            r.read_to_string(&mut s).unwrap();
             e.extend(s.lines().map(|ss| ss.to_string()));
             true
         }
         Err(e) => {
             let mut stderr = io::stderr();
-            (write!(&mut stderr as &mut Writer,
-                    "Error reading {}: {}", p.display(), e)).unwrap();
-            os::set_exit_status(10);
+            (write!(&mut stderr,
+                    "Error reading {:?}: {}", p, e)).unwrap();
+            env::set_exit_status(10);
             false
         }
     }
@@ -158,48 +158,71 @@ fn read_lines_into<E: Extend<String>>
 
 type Externs = HashMap<String, Vec<String>>;
 
-/// Extract the expanded ast of a crate, along with the codemap which
-/// connects source code locations to the actual code.
+struct Calls<F> {
+    f: Option<F>
+}
+
+impl<'a, F> rustc_driver::CompilerCalls<'a> for Calls<F>
+    where F: 'a + Fn(&session::Session, &ast::Crate,
+                     &privacy::ExportedItems, &privacy::PublicItems)
+{
+    fn early_callback(&mut self,
+                      _matches: &getopts::Matches,
+                      _descriptions: &diagnostics::registry::Registry)
+                      -> Compilation {
+        Compilation::Continue
+    }
+
+    fn no_input(&mut self,
+                _matches: &getopts::Matches,
+                _sopts: &config::Options,
+                _odir: &Option<PathBuf>,
+                _ofile: &Option<PathBuf>,
+                _descriptions: &diagnostics::registry::Registry)
+                -> Option<(config::Input, Option<PathBuf>)> {
+        unreachable!()
+    }
+
+    fn parse_pretty(&mut self,
+                    _sess: &session::Session,
+                    _matches: &getopts::Matches)
+                    -> Option<(pretty::PpMode, Option<pretty::UserIdentifiedItem>)> {
+        None
+    }
+
+    fn late_callback(&mut self,
+                     matches: &getopts::Matches,
+                     sess: &session::Session,
+                     input: &config::Input,
+                     odir: &Option<PathBuf>,
+                     ofile: &Option<PathBuf>)
+                     -> Compilation {
+        rustc_driver::RustcDefaultCalls.late_callback(matches, sess, input, odir, ofile)
+    }
+
+    fn build_controller(&mut self, _sess: &session::Session) -> driver::CompileController<'a> {
+        let f = self.f.take().unwrap();
+        let mut controller = driver::CompileController::basic();
+        controller.after_analysis = driver::PhaseController {
+            stop: rustc_driver::Compilation::Stop,
+            callback: Box::new(move |state| {
+                let ca = state.analysis.unwrap();
+                let ty::CrateAnalysis { ref exported_items, ref public_items, ref ty_cx, .. } = *ca;
+                f(&ty_cx.sess, ty_cx.map.krate(), exported_items, public_items)
+            })
+        };
+        controller
+    }
+}
+
 /// Extract the expanded ast of a krate, along with the codemap which
 /// connects source code locations to the actual code.
-fn get_ast<F>(path: Path,
-              search_paths: SearchPaths, externs: Externs,
+#[allow(deprecated)]
+fn get_ast<F>(path: String,
               f: F)
         where F: Fn(&session::Session, &ast::Crate,
-                    &privacy::ExportedItems, &privacy::PublicItems) {
-    use syntax::diagnostic;
-    use rustc_trans::back::link;
-
-    // cargo culted from rustdoc_ng :(
-    let input = config::Input::File(path);
-
-    let sessopts = config::Options {
-        maybe_sysroot: Some(os::self_exe_path().unwrap().dir_path()),
-        externs: externs,
-        search_paths: search_paths,
-        .. config::basic_options().clone()
-    };
-
-    let codemap = syntax::codemap::CodeMap::new();
-    let diagnostic_handler =
-        diagnostic::default_handler(diagnostic::Auto, None, true);
-    let span_diagnostic_handler =
-        diagnostic::mk_span_handler(diagnostic_handler, codemap);
-
-    let sess = session::build_session_(sessopts, None, span_diagnostic_handler);
-
-    let cfg = config::build_configuration(&sess);
-
-
-    let mut controller = driver::CompileController::basic();
-    controller.after_analysis = driver::PhaseController {
-        stop: true,
-        callback: Box::new(|state| {
-            let ca = state.analysis.unwrap();
-            let ty::CrateAnalysis { ref exported_items, ref public_items, ref ty_cx, .. } = *ca;
-            f(&ty_cx.sess, ty_cx.map.krate(), exported_items, public_items)
-        })
-    };
-
-    driver::compile_input(sess, cfg, &input, &None, &None, None, controller);
+                    &privacy::ExportedItems, &privacy::PublicItems)
+{
+    let mut calls = Calls { f: Some(f) };
+    rustc_driver::run_compiler(&[format!("-L{}", LIBDIR), path], &mut calls);
 }
