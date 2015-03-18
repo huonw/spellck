@@ -1,5 +1,5 @@
 #![crate_name = "spellck"]
-#![feature(plugin_registrar)]
+#![feature(plugin_registrar, rustc_private, std_misc, core, collections, os, path, io)]
 
 
 extern crate syntax;

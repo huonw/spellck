@@ -1,5 +1,5 @@
 use std::os;
-use std::io::{File, BufferedReader};
+use std::old_io::{File, BufferedReader};
 use std::collections::HashSet ;
 use std::borrow::ToOwned;
 
@@ -67,17 +67,17 @@ impl LintPass for Misspellings {
         match self.loading_error {
             None => {}
             Some(ref e) => {
-                sess.err(&format!("failed to start misspelling lint: {}", *e)[]);
+                sess.err(&format!("failed to start misspelling lint: {}", *e));
                 return
             }
         }
 
         for attribute in krate.attrs.iter() {
             if let MetaNameValue(ref name, ref lit) = attribute.node.value.node {
-                if name.get() == "spellck_extra_words" {
+                if &**name == "spellck_extra_words" {
                     attr::mark_used(attribute);
                     if let LitStr(ref raw_words, _) = lit.node {
-                        self.words.extend(raw_words.get().words().map(|w| w.to_owned()));
+                        self.words.extend(raw_words.words().map(|w| w.to_owned()));
                     } else {
                         cx.sess().span_err(attribute.span, "malformed `spellck_extra_words` attribute")
                     }

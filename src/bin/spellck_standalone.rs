@@ -1,5 +1,6 @@
 #![crate_name = "spellck_standalone"]
 #![deny(missing_docs)]
+#![feature(os, io, rustc_private)]
 
 //! Prints the misspelled words in the public documentation &
 //! identifiers of a crate.
@@ -13,7 +14,8 @@ extern crate rustc_trans;
 
 extern crate spellck;
 
-use std::{io, os};
+use std::os;
+use std::old_io as io;
 use std::cell::Cell;
 use std::cmp::Ordering;
 use std::collections::{HashMap, HashSet, BinaryHeap};
@@ -180,7 +182,7 @@ fn get_ast<F>(path: Path,
 
     let codemap = syntax::codemap::CodeMap::new();
     let diagnostic_handler =
-        diagnostic::default_handler(diagnostic::Auto, None);
+        diagnostic::default_handler(diagnostic::Auto, None, true);
     let span_diagnostic_handler =
         diagnostic::mk_span_handler(diagnostic_handler, codemap);
 

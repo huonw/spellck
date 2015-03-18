@@ -7,7 +7,6 @@ use syntax::parse::token;
 use syntax::codemap::{Span, BytePos};
 use syntax::attr::AttrMetaMethods;
 use syntax::ast::NodeId;
-use syntax::ast_util::PostExpansionMethod;
 
 use rustc::middle::privacy::ExportedItems;
 
@@ -83,12 +82,12 @@ impl<'a> SpellingVisitor<'a> {
             !w.chars().all(|c| c.is_alphabetic()) || {
                 let lower = w.to_ascii_lowercase();
                 self.words.contains(&lower) ||
-                self.stemmed_word_is_correct(&lower[])
+                self.stemmed_word_is_correct(&lower)
             }
     }
 
     fn stemmed_word_is_correct(&self, w: &str) -> bool {
-        stem::get(w).ok().map_or(false, |s| self.words.contains(&s[]))
+        stem::get(w).ok().map_or(false, |s| self.words.contains(&s))
     }
 
     /// Check a word for correctness, including splitting `foo_bar`
@@ -111,18 +110,17 @@ impl<'a> SpellingVisitor<'a> {
 
         // spooky action at a distance; extracts the string
         // representation from TLS.
-        let word_ = token::get_ident(ident);
-        let word = word_.get();
+        let word = token::get_ident(ident);
         // secret rust internals, e.g. __std_macros
         if word.starts_with("__") { return }
 
         // the ident itself is correct, so shortcircuit to avoid doing
         // any of the submatching done below.
-        if self.raw_word_is_correct(word) {
+        if self.raw_word_is_correct(&word) {
             return
         }
 
-        self.check_subwords(word, pos);
+        self.check_subwords(&word, pos);
     }
 
     /// Check the #[doc="..."] (and the commment forms) attributes for
@@ -131,7 +129,7 @@ impl<'a> SpellingVisitor<'a> {
         for attr in attrs.iter() {
             if attr.check_name("doc") {
                 match attr.value_str() {
-                    Some(s) => self.check_subwords(s.get(), Position::new(attr.span, id)),
+                    Some(s) => self.check_subwords(&s, Position::new(attr.span, id)),
                     None => {}
                 }
             }
@@ -140,7 +138,7 @@ impl<'a> SpellingVisitor<'a> {
 
     /// Spell-check a whole krate.
     pub fn check_crate(&mut self, krate: &ast::Crate) {
-        self.check_doc_attrs(&krate.attrs[], ast::CRATE_NODE_ID);
+        self.check_doc_attrs(&krate.attrs, ast::CRATE_NODE_ID);
         visit::walk_crate(self, krate)
     }
 }
@@ -153,7 +151,7 @@ impl<'a, 'v> visit::Visitor<'v> for SpellingVisitor<'a> {
         if self.exported.contains(&foreign_item.id) {
             // don't check the ident; there's nothing the user can do to
             // control the name.
-            self.check_doc_attrs(&foreign_item.attrs[], foreign_item.id);
+            self.check_doc_attrs(&foreign_item.attrs, foreign_item.id);
         }
     }
 
@@ -169,7 +167,7 @@ impl<'a, 'v> visit::Visitor<'v> for SpellingVisitor<'a> {
             self.check_ident(item.ident, Position::new(item.span, item.id));
         }
         if is_exported {
-            self.check_doc_attrs(&item.attrs[], item.id);
+            self.check_doc_attrs(&item.attrs, item.id);
         }
 
         match item.node {
@@ -180,7 +178,7 @@ impl<'a, 'v> visit::Visitor<'v> for SpellingVisitor<'a> {
                 for var in ed.variants.iter() {
                     if self.exported.contains(&var.node.id) {
                         self.check_ident(var.node.name, Position::new(var.span, var.node.id));
-                        self.check_doc_attrs(&var.node.attrs[], var.node.id);
+                        self.check_doc_attrs(&var.node.attrs, var.node.id);
                     }
                 }
             }
@@ -188,33 +186,15 @@ impl<'a, 'v> visit::Visitor<'v> for SpellingVisitor<'a> {
                 visit::walk_item(self, item)
             }
             // impl Type { ... }
-            ast::ItemImpl(_, _, _, None, _, ref items) => {
+            ast::ItemImpl(_, _, _, ref trait_, _, ref items) => {
+                let is_trait = trait_.is_some();
                 for item in items.iter() {
-                    match *item {
-                        ast::MethodImplItem(ref method) => {
-                            if self.exported.contains(&method.id) {
-                                self.check_ident(method.pe_ident(),
-                                                 Position::new(method.span, method.id));
-                                self.check_doc_attrs(&method.attrs[], method.id);
-                            }
-                        }
-                        ast::TypeImplItem(ref item) => {
-                            if self.exported.contains(&item.id) {
-                                self.check_ident(item.ident,
-                                                 Position::new(item.span, item.id));
-                                self.check_doc_attrs(&item.attrs[], item.id);
-                            }
-                        }
+                    self.check_doc_attrs(&item.attrs, item.id);
+                    if !is_trait {
+                        // name comes from the trait
+                        self.check_ident(item.ident, Position::new(item.span, item.id));
                     }
                 }
-            }
-            // impl Trait for Type { ... }, only check the docs, the
-            // method names come from elsewhere.
-            ast::ItemImpl(_, _, _, Some(..), _, _) => {
-                let old_d_o = self.doc_only;
-                self.doc_only = true;
-                visit::walk_item(self, item);
-                self.doc_only = old_d_o;
             }
             ast::ItemTrait(..) if item.vis == ast::Public => {
                 visit::walk_item(self, item)
@@ -223,26 +203,9 @@ impl<'a, 'v> visit::Visitor<'v> for SpellingVisitor<'a> {
         }
     }
 
-    fn visit_ty_method(&mut self, method_type: &ast::TypeMethod) {
-        self.check_doc_attrs(&method_type.attrs[], method_type.id);
-        self.check_ident(method_type.ident, Position::new(method_type.span, method_type.id));
-        visit::walk_ty_method(self, method_type)
-    }
     fn visit_trait_item(&mut self, trait_item: &ast::TraitItem) {
-        match *trait_item {
-            ast::RequiredMethod(_) => {
-                visit::walk_trait_item(self, trait_item)
-            }
-            ast::ProvidedMethod(ref method) => {
-                self.check_doc_attrs(&method.attrs[], method.id);
-                self.check_ident(method.pe_ident(), Position::new(method.span, method.id));
-            }
-            ast::TypeTraitItem(ref item) => {
-                let ast::AssociatedType { ref attrs, ref ty_param } = **item;
-                self.check_doc_attrs(&attrs[], ty_param.id);
-                self.check_ident(ty_param.ident, Position::new(ty_param.span, ty_param.id));
-            }
-        }
+        self.check_doc_attrs(&trait_item.attrs, trait_item.id);
+        self.check_ident(trait_item.ident, Position::new(trait_item.span, trait_item.id));
     }
 
     fn visit_struct_def(&mut self,
@@ -260,7 +223,7 @@ impl<'a, 'v> visit::Visitor<'v> for SpellingVisitor<'a> {
                     ast::Public => {
                         self.check_ident(ident,
                                          Position::new(struct_field.span, struct_field.node.id));
-                        self.check_doc_attrs(&struct_field.node.attrs[],
+                        self.check_doc_attrs(&struct_field.node.attrs,
                                              struct_field.node.id);
                     }
                     ast::Inherited => {}

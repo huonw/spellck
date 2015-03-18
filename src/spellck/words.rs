@@ -24,7 +24,7 @@ impl<'a> Iterator for SubwordIter<'a> {
     type Item = &'a str;
     fn next(&mut self) -> Option<&'a str> {
         let mut word_start = self.word_start;
-        for (offset, c) in self.iter {
+        for (offset, c) in &mut self.iter {
             // skip leading non-alphabetic characters
             let alpha = c.is_alphabetic();
             match word_start {
