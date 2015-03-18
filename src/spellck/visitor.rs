@@ -79,11 +79,11 @@ impl<'a> SpellingVisitor<'a> {
     /// is automatically considered a proper word.
     fn raw_word_is_correct(&mut self, w: &str) -> bool {
         self.words.contains(w) ||
-            !w.chars().all(|c| c.is_alphabetic()) || {
+            (w.chars().all(|c| c.is_alphabetic()) && {
                 let lower = w.to_ascii_lowercase();
                 self.words.contains(&lower) ||
                 self.stemmed_word_is_correct(&lower)
-            }
+            })
     }
 
     fn stemmed_word_is_correct(&self, w: &str) -> bool {
