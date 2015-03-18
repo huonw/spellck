@@ -56,10 +56,6 @@ pub struct SpellingVisitor<'a> {
 
     /// The misspelled words
     pub misspellings: BTreeMap<Position, Vec<String>>,
-
-    /// Whether the traversal should only check documentation, not
-    /// idents; gets controlled internally, e.g. for `extern` blocks.
-    doc_only: bool
 }
 
 impl<'a> SpellingVisitor<'a> {
@@ -70,7 +66,6 @@ impl<'a> SpellingVisitor<'a> {
             words: words,
             exported: exported,
             misspellings: BTreeMap::new(),
-            doc_only: false
         }
     }
 
@@ -106,8 +101,6 @@ impl<'a> SpellingVisitor<'a> {
     /// Check a single ident for misspellings; possibly separating it
     /// into subwords.
     fn check_ident(&mut self, ident: ast::Ident, pos: Position) {
-        if self.doc_only { return }
-
         // spooky action at a distance; extracts the string
         // representation from TLS.
         let word = token::get_ident(ident);
