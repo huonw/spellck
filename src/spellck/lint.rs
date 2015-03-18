@@ -1,6 +1,8 @@
-use std::os;
-use std::old_io::{File, BufferedReader};
-use std::collections::HashSet ;
+use std::env;
+use std::io::prelude::*;
+use std::io::BufReader;
+use std::fs::File;
+use std::collections::HashSet;
 use std::borrow::ToOwned;
 
 use syntax::attr;
@@ -27,19 +29,19 @@ impl Misspellings {
             words: HashSet::new(),
             loading_error: None
         };
-        let paths = match os::getenv(DICT_ENV_VAR) {
-            Some(p) => os::split_paths(p),
-            None => {
+        let paths = match env::var(DICT_ENV_VAR) {
+            Ok(p) => p,
+            Err(_) => {
                 ret.loading_error = Some(format!("environment variable `{}` not specified",
                                                  DICT_ENV_VAR));
                 return ret
             }
         };
 
-        for p in paths.into_iter().map(Path::new) {
+        for p in env::split_paths(&paths) {
             let words = File::open(&p)
                 .and_then(|f| {
-                    let mut rdr = BufferedReader::new(f);
+                    let rdr = BufReader::new(f);
                     let lines = rdr.lines().map(|l| l.map(|s| s.trim().to_string()));
                     lines.collect::<Result<Vec<String>, _>>()
                 });
@@ -47,7 +49,7 @@ impl Misspellings {
             match words {
                 Ok(w) => ret.words.extend(w.into_iter()),
                 Err(e) => {
-                    ret.loading_error = Some(format!("error loading `{}`: {}", p.display(), e));
+                    ret.loading_error = Some(format!("error loading `{:?}`: {}", p, e));
                     return ret
                 }
             }
