@@ -79,7 +79,7 @@ impl LintPass for Misspellings {
                 if &**name == "spellck_extra_words" {
                     attr::mark_used(attribute);
                     if let LitStr(ref raw_words, _) = lit.node {
-                        self.words.extend(raw_words.words().map(|w| w.to_owned()));
+                        self.words.extend(raw_words.split_whitespace().map(|w| w.to_owned()));
                     } else {
                         cx.sess().span_err(attribute.span, "malformed `spellck_extra_words` attribute")
                     }

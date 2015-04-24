@@ -1,7 +1,7 @@
 #![crate_name = "spellck_standalone"]
 #![deny(missing_docs)]
 #![feature(rustc_private)]
-#![feature(collections, exit_status, std_misc)]
+#![feature(collections, exit_status)]
 
 //! Prints the misspelled words in the public documentation &
 //! identifiers of a crate.
@@ -17,7 +17,7 @@ extern crate rustc_trans;
 extern crate spellck;
 
 use std::env;
-use std::path::{AsPath, PathBuf};
+use std::path::{Path, PathBuf};
 use std::fs::File;
 use std::io;
 use std::io::prelude::*;
@@ -119,13 +119,11 @@ fn main() {
                          words = if words.len() == 1 {"word"} else {"words"});
 
                 // first line; no lines = no printing
-                match &*lines.lines {
-                    [line_num, ..] => {
-                        if let Some(line) = lines.file.get_line(line_num) {
-                            println!("{}: {}", sp_text, line);
-                        }
+                if lines.lines.len() >= 1 {
+                    let line_num = lines.lines[0].line_index;
+                    if let Some(line) = lines.file.get_line(line_num) {
+                        println!("{}: {}", sp_text, line);
                     }
-                    _ => {}
                 }
             }
         })
@@ -137,7 +135,7 @@ fn main() {
 }
 
 /// Load each line of the file `p` into the given `Extend` object.
-fn read_lines_into<P: AsPath + ::std::fmt::Debug + ?Sized, E: Extend<String>>
+fn read_lines_into<P: AsRef<Path> + ::std::fmt::Debug + ?Sized, E: Extend<String>>
                   (p: &P, e: &mut E) -> bool {
     match File::open(p) {
         Ok(mut r) => {

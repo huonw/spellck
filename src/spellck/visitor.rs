@@ -13,7 +13,7 @@ use rustc::middle::privacy::ExportedItems;
 use words;
 use stem;
 
-#[derive(Copy)]
+#[derive(Copy, Debug, Clone)]
 pub struct Position {
     pub span: Span,
     pub id: NodeId,
@@ -93,7 +93,7 @@ impl<'a> SpellingVisitor<'a> {
         for w in words::subwords(w) {
             if !self.raw_word_is_correct(w) {
                 let w = w.to_string();
-                self.misspellings.entry(pos).get().unwrap_or_else(|v| v.insert(vec![])).push(w);
+                self.misspellings.entry(pos).or_insert(vec![]).push(w);
             }
         }
     }

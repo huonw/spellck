@@ -25,3 +25,6 @@ name = "spellck_standalone"
 
 [dependencies.stem]
 git = "https://github.com/mrordinaire/rust-stem"
+
+#[dependencies]
+#getopts = "0.2"

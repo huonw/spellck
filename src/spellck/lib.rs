@@ -1,6 +1,5 @@
 #![crate_name = "spellck"]
 #![feature(plugin_registrar, rustc_private)]
-#![feature(str_words, collections)]
 
 extern crate syntax;
 #[macro_use] extern crate rustc;
